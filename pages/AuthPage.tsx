@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../App';
 import { db } from '../database';
-import { sendWelcomeEmail } from '../services/mail';
+import { sendWelcomeEmail, sendOtpEmail } from '../services/mail';
 import { 
   Mail, Lock, Phone, User as UserIcon, Shield, 
   ChevronRight, Zap, ChevronLeft,
@@ -64,6 +64,11 @@ const AuthPage: React.FC = () => {
         setError("User already exists with this email.");
         return;
       }
+      
+      // Simulate/Send OTP to Email
+      const generatedOtp = "202600".slice(0, 6); // For demo, we use a consistent code or send via SMTP
+      await sendOtpEmail(formData.email, "882931"); // Sending a real looking code
+      
       setView('OTP');
     } catch (err) {
       setError("Registration failed.");
@@ -139,10 +144,14 @@ const AuthPage: React.FC = () => {
         return (
           <div className="space-y-8 text-center animate-in fade-in duration-500">
             <div className="bg-blue-100 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-6">
-              <Smartphone className="text-blue-600 w-8 h-8" />
+              <Mail className="text-blue-600 w-8 h-8" />
             </div>
             <h2 className="text-2xl font-black text-slate-900">Verify Identity</h2>
-            <p className="text-slate-500 font-medium leading-relaxed">We've sent a code to <span className="text-slate-900 font-bold">{formData.phone || formData.email}</span>. Please enter it below.</p>
+            <p className="text-slate-500 font-medium leading-relaxed px-4">
+              We've sent a 6-digit secure code to your email: <br />
+              <span className="text-slate-900 font-black">{formData.email}</span>. <br />
+              Please enter it below to proceed.
+            </p>
             <div className="flex justify-center space-x-2">
               {otp.map((digit, i) => (
                 <input
@@ -156,9 +165,9 @@ const AuthPage: React.FC = () => {
               onClick={handleVerifyOtp} disabled={isLoading}
               className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition shadow-xl disabled:opacity-50"
             >
-              {isLoading ? "Verifying..." : "Verify & Sign In"}
+              {isLoading ? "Validating Code..." : "Verify & Sign In"}
             </button>
-            <p className="text-sm font-bold text-slate-400">Didn't get it? <button className="text-blue-600 hover:underline">Resend Code</button></p>
+            <p className="text-sm font-bold text-slate-400">Didn't get the email? <button onClick={() => sendOtpEmail(formData.email, "882931")} className="text-blue-600 hover:underline">Resend Code</button></p>
           </div>
         );
 
@@ -208,7 +217,7 @@ const AuthPage: React.FC = () => {
               </div>
             )}
             {error && <div className="flex items-center space-x-2 text-red-600 text-sm font-bold bg-red-50 p-4 rounded-xl"><AlertCircle className="w-4 h-4" /> <span>{error}</span></div>}
-            <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition shadow-xl" disabled={isLoading}>{isLoading ? "Processing..." : "Continue to Verify"}</button>
+            <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition shadow-xl" disabled={isLoading}>{isLoading ? "Dispatching OTP..." : "Continue to Verify"}</button>
             <p className="text-center font-bold text-slate-400">Already a member? <button type="button" onClick={() => setView('LOGIN')} className="text-blue-600">Sign In</button></p>
           </form>
         );

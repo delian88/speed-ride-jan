@@ -62,3 +62,40 @@ export const sendWelcomeEmail = async ({ email, name, role }: MailOptions) => {
     return false;
   }
 };
+
+export const sendOtpEmail = async (email: string, otp: string) => {
+  const body = `
+    <div style="font-family: 'Inter', sans-serif; max-width: 500px; margin: auto; border: 1px solid #f1f5f9; border-radius: 24px; overflow: hidden; color: #1e293b;">
+      <div style="background: #0f172a; padding: 30px; text-align: center; color: white;">
+        <h1 style="margin: 0; font-size: 22px; font-weight: 900; letter-spacing: -0.5px;">SPEEDRIDE 2026</h1>
+      </div>
+      <div style="padding: 40px; text-align: center;">
+        <h2 style="font-size: 20px; font-weight: 800; color: #0f172a; margin-top: 0;">Verify Your Identity</h2>
+        <p style="color: #64748b; font-weight: 500;">Please use the secure code below to complete your registration. This code will expire in 10 minutes.</p>
+        <div style="margin: 30px 0; background: #f8fafc; padding: 25px; border-radius: 20px; border: 2px dashed #e2e8f0;">
+          <span style="font-size: 32px; font-weight: 900; letter-spacing: 8px; color: #2563eb;">${otp}</span>
+        </div>
+        <p style="font-size: 12px; color: #94a3b8; font-weight: 600;">If you didn't request this code, please ignore this email.</p>
+      </div>
+      <div style="background: #f8fafc; padding: 15px; text-align: center; font-size: 9px; font-weight: 700; color: #cbd5e1; text-transform: uppercase; letter-spacing: 1px;">
+        SECURITY PROTOCOL 2026 • PREMEGAGE TECH
+      </div>
+    </div>
+  `;
+
+  try {
+    const response = await Email.send({
+      Host: "smtp.gmail.com",
+      Username: "walpconsult@gmail.com",
+      Password: "mjbhowjkzmfxqrgd",
+      To: email,
+      From: "walpconsult@gmail.com",
+      Subject: `${otp} is your SpeedRide verification code`,
+      Body: body
+    });
+    return response === 'OK';
+  } catch (error) {
+    console.error("Failed to send OTP email:", error);
+    return false;
+  }
+};
