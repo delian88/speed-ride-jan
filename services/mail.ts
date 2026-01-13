@@ -7,6 +7,13 @@ interface MailOptions {
   role: 'RIDER' | 'DRIVER';
 }
 
+const SMTP_CONFIG = {
+  Host: "smtp.gmail.com",
+  Username: "walpconsult@gmail.com",
+  Password: "mjbhowjkzmfxqrgd",
+  From: "walpconsult@gmail.com"
+};
+
 export const sendWelcomeEmail = async ({ email, name, role }: MailOptions) => {
   const isDriver = role === 'DRIVER';
   const subject = isDriver 
@@ -31,7 +38,7 @@ export const sendWelcomeEmail = async ({ email, name, role }: MailOptions) => {
             : "You are now ready to experience the fastest, safest, and most premium ride-hailing service in the city."}
         </p>
         <div style="margin: 40px 0; text-align: center;">
-          <a href="https://speedride-2026.vercel.app" style="background: #0f172a; color: white; padding: 18px 36px; border-radius: 16px; text-decoration: none; font-weight: 800; font-size: 14px; display: inline-block;">
+          <a href="#" style="background: #0f172a; color: white; padding: 18px 36px; border-radius: 16px; text-decoration: none; font-weight: 800; font-size: 14px; display: inline-block;">
             LAUNCH DASHBOARD
           </a>
         </div>
@@ -47,18 +54,15 @@ export const sendWelcomeEmail = async ({ email, name, role }: MailOptions) => {
 
   try {
     const response = await Email.send({
-      Host: "smtp.gmail.com",
-      Username: "walpconsult@gmail.com",
-      Password: "mjbhowjkzmfxqrgd",
+      ...SMTP_CONFIG,
       To: email,
-      From: "walpconsult@gmail.com",
       Subject: subject,
       Body: body
     });
-    console.log("Welcome email status:", response);
+    console.log("SpeedRide SMTP | Welcome Email Response:", response);
     return response === 'OK';
   } catch (error) {
-    console.error("Failed to send welcome email:", error);
+    console.error("SpeedRide SMTP | Welcome Email Error:", error);
     return false;
   }
 };
@@ -85,17 +89,15 @@ export const sendOtpEmail = async (email: string, otp: string) => {
 
   try {
     const response = await Email.send({
-      Host: "smtp.gmail.com",
-      Username: "walpconsult@gmail.com",
-      Password: "mjbhowjkzmfxqrgd",
+      ...SMTP_CONFIG,
       To: email,
-      From: "walpconsult@gmail.com",
       Subject: `${otp} is your SpeedRide verification code`,
       Body: body
     });
+    console.log("SpeedRide SMTP | OTP Email Response:", response);
     return response === 'OK';
   } catch (error) {
-    console.error("Failed to send OTP email:", error);
+    console.error("SpeedRide SMTP | OTP Email Error:", error);
     return false;
   }
 };
