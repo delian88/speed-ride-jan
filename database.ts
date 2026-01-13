@@ -106,8 +106,8 @@ class MockDatabase {
           rating: 4.9,
           balance: 150000,
           vehicleType: VehicleType.PREMIUM,
-          vehicleModel: 'Lexus ES 350',
-          plateNumber: 'LAG-777-SR',
+          vehicleModel: 'Tesla Model 3 (2026)',
+          plateNumber: 'LAG-777-2026',
           isOnline: true,
           isVerified: true
         },
