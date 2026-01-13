@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../App';
 import { db } from '../database';
+import { sendWelcomeEmail } from '../services/mail';
 import { 
   Mail, Lock, Phone, User as UserIcon, Shield, 
   ChevronRight, Zap, ChevronLeft,
@@ -88,6 +89,16 @@ const AuthPage: React.FC = () => {
           isVerified: false
         } : {})
       });
+
+      // Trigger Welcome Email (Async)
+      if (role !== 'ADMIN') {
+        sendWelcomeEmail({
+          email: formData.email,
+          name: formData.name,
+          role: role as 'RIDER' | 'DRIVER'
+        });
+      }
+
       setView('SUCCESS');
       setTimeout(() => {
         login(newUser as any);
@@ -120,7 +131,7 @@ const AuthPage: React.FC = () => {
               <Zap className="w-10 h-10 fill-current" />
             </div>
             <h2 className="text-3xl font-black text-slate-900">Verified!</h2>
-            <p className="text-slate-500 font-bold">Account created successfully. Redirecting you to your dashboard...</p>
+            <p className="text-slate-500 font-bold">Account created successfully. A welcome email has been dispatched to your inbox.</p>
           </div>
         );
 
