@@ -20,11 +20,11 @@ const RiderExplore: React.FC = () => {
   const { currentUser } = useApp();
   const [rideStep, setRideStep] = useState<'INPUT' | 'MATCHING' | 'ON_RIDE'>('INPUT');
   const [rideStatus, setRideStatus] = useState<RideStatus>(RideStatus.REQUESTED);
-  const [pickup, setPickup] = useState('My Location');
+  const [pickup, setPickup] = useState('Current Location');
   const [dropoff, setDropoff] = useState('');
   const [distance, setDistance] = useState(0);
   const [selectedType, setSelectedType] = useState<VehicleType>(VehicleType.ECONOMY);
-  const [pricePerKm, setPricePerKm] = useState(2000); // Updated to 2000/km
+  const [pricePerKm, setPricePerKm] = useState(2000); 
   const [eta, setEta] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'WALLET' | 'CARD'>('WALLET');
 
@@ -43,7 +43,7 @@ const RiderExplore: React.FC = () => {
     const bounds = new google.maps.LatLngBounds();
     let hasCoords = false;
     
-    if (pickupMarkerRef.current?.getPosition() && pickup && pickup !== 'My Location') {
+    if (pickupMarkerRef.current?.getPosition() && pickup && pickup !== 'Current Location') {
       bounds.extend(pickupMarkerRef.current.getPosition());
       hasCoords = true;
     }
@@ -53,9 +53,9 @@ const RiderExplore: React.FC = () => {
     }
 
     if (hasCoords) {
-      mapRef.current.fitBounds(bounds, { top: 100, bottom: 100, left: 100, right: 100 });
-      if (!dropoff || !pickup || pickup === 'My Location') {
-        setTimeout(() => mapRef.current.setZoom(15), 100);
+      mapRef.current.fitBounds(bounds, { top: 120, bottom: 120, left: 120, right: 120 });
+      if (!dropoff || !pickup || pickup === 'Current Location') {
+        setTimeout(() => mapRef.current.setZoom(16), 100);
       }
     }
   };
@@ -65,7 +65,7 @@ const RiderExplore: React.FC = () => {
     const service = new google.maps.DirectionsService();
     service.route(
       {
-        origin: origin,
+        origin: origin === 'Current Location' ? pickupMarkerRef.current.getPosition() : origin,
         destination: destination,
         travelMode: google.maps.TravelMode.DRIVING,
       },
@@ -86,9 +86,12 @@ const RiderExplore: React.FC = () => {
 
     const initMap = () => {
       if (mapContainerRef.current && typeof google !== 'undefined' && google.maps) {
+        // Updated Default Center: Minna, Niger State
+        const minnaCenter = { lat: 9.6139, lng: 6.5569 };
+        
         mapRef.current = new google.maps.Map(mapContainerRef.current, {
-          center: { lat: 6.5244, lng: 3.3792 }, // Lagos, Nigeria
-          zoom: 12,
+          center: minnaCenter,
+          zoom: 14,
           disableDefaultUI: true,
           styles: [
             { featureType: "all", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
@@ -105,6 +108,7 @@ const RiderExplore: React.FC = () => {
 
         pickupMarkerRef.current = new google.maps.Marker({
           map: mapRef.current,
+          position: minnaCenter,
           icon: {
             path: google.maps.SymbolPath.CIRCLE,
             scale: 10,
@@ -131,6 +135,8 @@ const RiderExplore: React.FC = () => {
           const autocompleteOptions = {
             componentRestrictions: { country: "NG" },
             fields: ["formatted_address", "geometry", "name"],
+            location: new google.maps.LatLng(9.6139, 6.5569),
+            radius: 50000, // 50km bias toward Minna
           };
 
           const pAuto = new google.maps.places.Autocomplete(pickupInputRef.current, autocompleteOptions);
@@ -153,7 +159,7 @@ const RiderExplore: React.FC = () => {
               dropoffMarkerRef.current.setPosition(place.geometry.location);
               dropoffMarkerRef.current.setMap(mapRef.current);
               updateMapBounds();
-              if (pickup && pickup !== 'My Location') getRoute(pickup, place.formatted_address || place.name);
+              if (pickup) getRoute(pickup, place.formatted_address || place.name);
             }
           });
         }
@@ -184,9 +190,8 @@ const RiderExplore: React.FC = () => {
       [VehicleType.ECONOMY]: 1.0, [VehicleType.PREMIUM]: 1.5, [VehicleType.XL]: 2.0, [VehicleType.BIKE]: 0.5
     };
     const multiplier = multipliers[type] || 1.0;
-    // Calculate fare based on 2000/km as requested
     const calculated = distance * pricePerKm * multiplier;
-    return Math.max(calculated, 500); // Minimum 500 NGN
+    return Math.max(calculated, 1000); // ₦1,000 Minimum
   };
 
   const currentFare = calculateFare(selectedType);
@@ -196,8 +201,8 @@ const RiderExplore: React.FC = () => {
     setTimeout(() => {
       setRideStep('ON_RIDE');
       setRideStatus(RideStatus.IN_PROGRESS);
-      setEta(5);
-    }, 3000);
+      setEta(Math.floor(Math.random() * 5) + 2);
+    }, 4000);
   };
 
   return (
@@ -281,21 +286,21 @@ const RiderExplore: React.FC = () => {
           {/* Fare Details */}
           <div className="border-t border-slate-100 pt-6 space-y-4">
             <div className="flex justify-between items-center group cursor-pointer">
-              <span className="font-bold text-slate-500 text-sm">Fare Details</span>
+              <span className="font-bold text-slate-500 text-sm">Fare Analysis</span>
               <ChevronDown className="w-4 h-4 text-slate-300 group-hover:text-slate-900 transition" />
             </div>
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-slate-400 font-medium">Distance</span>
+                <span className="text-slate-400 font-medium">Trip Distance</span>
                 <span className="font-bold text-slate-900">{distance.toFixed(2)} KM</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-slate-400 font-medium">Rate (₦)</span>
+                <span className="text-slate-400 font-medium">Standard Rate</span>
                 <span className="font-bold text-slate-900">₦{pricePerKm.toLocaleString()} / KM</span>
               </div>
               <div className="flex justify-between items-center pt-2">
-                <span className="text-slate-900 font-black text-sm">Estimated Total</span>
-                <span className="text-xl font-black text-slate-900">₦{Math.round(currentFare).toLocaleString()}</span>
+                <span className="text-slate-900 font-black text-sm uppercase tracking-widest">Total Estimated</span>
+                <span className="text-2xl font-black text-slate-900">₦{Math.round(currentFare).toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -303,7 +308,7 @@ const RiderExplore: React.FC = () => {
           {/* Payment Method */}
           <div className="border-t border-slate-100 pt-6 space-y-4">
             <div className="flex justify-between items-center group cursor-pointer">
-              <span className="font-bold text-slate-500 text-sm">Payment Method</span>
+              <span className="font-bold text-slate-500 text-sm">Wallet & Payment</span>
               <ChevronDown className="w-4 h-4 text-slate-300 group-hover:text-slate-900 transition" />
             </div>
             <div className="grid grid-cols-2 gap-3">
@@ -312,14 +317,14 @@ const RiderExplore: React.FC = () => {
                 className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all ${paymentMethod === 'WALLET' ? 'border-blue-600 bg-blue-50/20' : 'border-slate-50 bg-slate-50 text-slate-400'}`}
               >
                 <Wallet className={`w-4 h-4 ${paymentMethod === 'WALLET' ? 'text-blue-600' : ''}`} />
-                <span className="text-xs font-black">Wallet (₦{currentUser?.balance.toLocaleString()})</span>
+                <span className="text-[10px] font-black uppercase">Balance: ₦{currentUser?.balance.toLocaleString()}</span>
               </button>
               <button 
                 onClick={() => setPaymentMethod('CARD')}
                 className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all ${paymentMethod === 'CARD' ? 'border-blue-600 bg-blue-50/20' : 'border-slate-50 bg-slate-50 text-slate-400'}`}
               >
                 <CreditCard className={`w-4 h-4 ${paymentMethod === 'CARD' ? 'text-blue-600' : ''}`} />
-                <span className="text-xs font-black">Card **** 1234</span>
+                <span className="text-[10px] font-black uppercase">Card: **** 1234</span>
               </button>
             </div>
           </div>
@@ -330,7 +335,7 @@ const RiderExplore: React.FC = () => {
             disabled={!pickup || !dropoff || distance === 0}
             className="w-full py-5 bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl shadow-slate-200 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-30 disabled:grayscale"
           >
-            {rideStep === 'MATCHING' ? 'Synchronizing Node...' : 'Confirm Ride'}
+            {rideStep === 'MATCHING' ? 'Connecting to Fleet...' : 'Request Ride Now'}
           </button>
         </div>
       </div>
@@ -349,6 +354,21 @@ const RiderExplore: React.FC = () => {
             <RefreshCw className="w-6 h-6" />
           </button>
         </div>
+
+        {/* Matching Overlay */}
+        {rideStep === 'MATCHING' && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-900/10 backdrop-blur-sm">
+            <div className="bg-white p-12 rounded-[60px] shadow-2xl flex flex-col items-center space-y-6 animate-in zoom-in duration-500">
+               <div className="w-24 h-24 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center animate-pulse">
+                 <Search className="w-12 h-12" />
+               </div>
+               <div className="text-center">
+                 <p className="text-2xl font-black text-slate-900 tracking-tight">Syncing Nearest Pilot</p>
+                 <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em] mt-1">Minna Regional Fleet v2.0</p>
+               </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -357,7 +377,7 @@ const RiderExplore: React.FC = () => {
 const RiderDashboard: React.FC = () => {
   const { logout, currentUser } = useApp();
   const navigate = useNavigate();
-  const [currentCity, setCurrentCity] = useState('Locating...');
+  const [currentCity, setCurrentCity] = useState('Minna, Niger State');
 
   useEffect(() => {
     if (navigator.geolocation && typeof google !== 'undefined') {
@@ -366,14 +386,13 @@ const RiderDashboard: React.FC = () => {
         const latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
         geocoder.geocode({ location: latlng }, (results: any, status: any) => {
           if (status === "OK" && results[0]) {
-            // Find city/state in address components
             const city = results[0].address_components.find((c: any) => c.types.includes("locality"))?.long_name 
                       || results[0].address_components.find((c: any) => c.types.includes("administrative_area_level_1"))?.long_name
-                      || "Nigeria";
-            setCurrentCity(city);
+                      || "Minna";
+            setCurrentCity(`${city}, Nigeria`);
           }
         });
-      }, () => setCurrentCity("Nigeria"));
+      }, () => setCurrentCity("Minna, Niger State"));
     }
   }, []);
 
@@ -387,15 +406,15 @@ const RiderDashboard: React.FC = () => {
           <Logo className="h-10 w-auto brightness-0 invert" />
           <div className="hidden md:flex items-center space-x-3 bg-white/5 px-6 py-3 rounded-xl border border-white/5 cursor-pointer hover:bg-white/10 transition">
             <MapPin className="w-4 h-4 text-blue-500" />
-            <span className="text-xs font-black">{currentCity}</span>
+            <span className="text-xs font-black uppercase tracking-widest">{currentCity}</span>
             <ChevronDown className="w-3 h-3 text-white/40" />
           </div>
         </div>
 
         <nav className="hidden lg:flex items-center space-x-10 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">
-           <NavLink to="/rider" end className={({isActive}) => isActive ? "text-white" : "hover:text-white transition"}>Booking Hub</NavLink>
-           <NavLink to="/rider/history" className={({isActive}) => isActive ? "text-white" : "hover:text-white transition"}>Journey Logs</NavLink>
-           <NavLink to="/rider/wallet" className={({isActive}) => isActive ? "text-white" : "hover:text-white transition"}>Transactions</NavLink>
+           <NavLink to="/rider" end className={({isActive}) => isActive ? "text-white" : "hover:text-white transition"}>Dashboard</NavLink>
+           <NavLink to="/rider/history" className={({isActive}) => isActive ? "text-white" : "hover:text-white transition"}>Journey History</NavLink>
+           <NavLink to="/rider/wallet" className={({isActive}) => isActive ? "text-white" : "hover:text-white transition"}>Wallet</NavLink>
         </nav>
 
         <div className="flex items-center space-x-6">
@@ -406,7 +425,7 @@ const RiderDashboard: React.FC = () => {
           
           <div className="flex items-center space-x-4 pl-6 border-l border-white/5">
              <div className="text-right hidden sm:block">
-                <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Available</p>
+                <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Balance</p>
                 <p className="text-sm font-black text-blue-400">₦{currentUser.balance.toLocaleString()}</p>
              </div>
              <div className="relative group">
@@ -415,8 +434,8 @@ const RiderDashboard: React.FC = () => {
                   <ChevronDown className="w-3 h-3 text-white/40" />
                </button>
                <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all py-2 text-slate-900">
-                  <button onClick={() => navigate('/rider/profile')} className="w-full flex items-center space-x-3 px-5 py-3 hover:bg-slate-50 transition font-black text-xs uppercase tracking-widest"><UserIcon className="w-4 h-4" /> <span>Identity</span></button>
-                  <button onClick={logout} className="w-full flex items-center space-x-3 px-5 py-3 hover:bg-red-50 text-red-600 transition font-black text-xs uppercase tracking-widest"><LogOut className="w-4 h-4" /> <span>Terminate Session</span></button>
+                  <button onClick={() => navigate('/rider/profile')} className="w-full flex items-center space-x-3 px-5 py-3 hover:bg-slate-50 transition font-black text-xs uppercase tracking-widest"><UserIcon className="w-4 h-4" /> <span>Profile</span></button>
+                  <button onClick={logout} className="w-full flex items-center space-x-3 px-5 py-3 hover:bg-red-50 text-red-600 transition font-black text-xs uppercase tracking-widest"><LogOut className="w-4 h-4" /> <span>Logout</span></button>
                </div>
              </div>
           </div>
@@ -442,14 +461,14 @@ const RiderHistory: React.FC = () => {
   useEffect(() => { if (currentUser?.id) db.rides.getByUser(currentUser.id).then(setRides); }, [currentUser]);
   return (
     <div className="p-10 max-w-5xl mx-auto space-y-8 h-full overflow-y-auto pb-32">
-      <h2 className="text-4xl font-black text-slate-900 tracking-tight">Telemetry History</h2>
+      <h2 className="text-4xl font-black text-slate-900 tracking-tight">Recent Journeys</h2>
       <div className="grid gap-4">
         {rides.map(r => (
           <div key={r.id} className="bg-white p-8 rounded-[32px] border border-slate-100 flex items-center justify-between group hover:shadow-xl transition-all duration-500">
             <div className="flex items-center space-x-6">
                <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 group-hover:bg-blue-50 group-hover:text-blue-500 transition"><Navigation className="w-6 h-6" /></div>
                <div>
-                  <p className="font-black text-slate-900 text-lg">{(r.dropoff || 'Journey').split(',')[0]}</p>
+                  <p className="font-black text-slate-900 text-lg">{(r.dropoff || 'Unknown Destination').split(',')[0]}</p>
                   <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">{new Date(r.createdAt).toLocaleDateString()} • {r.status}</p>
                </div>
             </div>
@@ -465,13 +484,13 @@ const RiderWallet: React.FC = () => {
   const { currentUser } = useApp();
   return (
     <div className="p-10 max-w-5xl mx-auto space-y-10 h-full overflow-y-auto pb-32">
-      <h2 className="text-4xl font-black text-slate-900 tracking-tight">Neural Wallet</h2>
+      <h2 className="text-4xl font-black text-slate-900 tracking-tight">Financial Hub</h2>
       <div className="bg-slate-900 p-12 rounded-[50px] text-white shadow-2xl relative overflow-hidden group">
         <Zap className="absolute top-0 right-0 p-12 opacity-10 w-48 h-48 group-hover:scale-110 transition-transform duration-1000" />
-        <p className="text-xs font-black uppercase tracking-[0.4em] opacity-40 mb-3">Available Balance</p>
+        <p className="text-xs font-black uppercase tracking-[0.4em] opacity-40 mb-3">Total Account Balance</p>
         <p className="text-6xl font-black tracking-tighter">₦{(currentUser?.balance || 0).toLocaleString()}</p>
         <div className="mt-12 flex space-x-4">
-           <button className="bg-white text-slate-900 px-10 py-5 rounded-2xl font-black hover:bg-blue-600 hover:text-white transition-all shadow-xl">Top Up Account</button>
+           <button className="bg-white text-slate-900 px-10 py-5 rounded-2xl font-black hover:bg-blue-600 hover:text-white transition-all shadow-xl">Add Funds</button>
            <button className="bg-white/10 text-white px-10 py-5 rounded-2xl font-black hover:bg-white/20 transition-all backdrop-blur-md">Auto-Reload</button>
         </div>
       </div>
@@ -490,7 +509,7 @@ const RiderProfile: React.FC = () => {
            <div>
               <p className="text-3xl font-black text-slate-900 tracking-tighter">{currentUser?.name}</p>
               <p className="text-slate-400 font-bold text-lg">{currentUser?.email}</p>
-              <div className="mt-4 inline-flex items-center space-x-2 bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full font-black text-xs uppercase tracking-widest">Elite Member • 4.98</div>
+              <div className="mt-4 inline-flex items-center space-x-2 bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full font-black text-xs uppercase tracking-widest">Speed Partner • 4.98</div>
            </div>
         </div>
       </div>
