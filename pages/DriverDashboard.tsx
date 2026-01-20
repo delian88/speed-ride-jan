@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Routes, Route, NavLink } from 'react-router-dom';
 import { 
   Car, User as UserIcon, DollarSign, Activity, Bell, 
@@ -9,14 +9,35 @@ import {
 import { useApp } from '../App';
 import { db } from '../database';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Driver, RideRequest } from '../types';
+import { Driver, RideRequest, RideStatus } from '../types';
 import Logo from '../components/Logo';
 
 const DriverOverview: React.FC<{ driver: Driver, isOnline: boolean, toggleOnline: () => void }> = ({ driver, isOnline, toggleOnline }) => {
-  const earningsData = [
-    { name: 'Mon', amount: 12000 }, { name: 'Tue', amount: 24000 }, { name: 'Wed', amount: 18000 },
-    { name: 'Thu', amount: 32000 }, { name: 'Fri', amount: 45000 }, { name: 'Sat', amount: 56000 }, { name: 'Sun', amount: 38000 },
-  ];
+  const [rides, setRides] = useState<RideRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRides = async () => {
+      const data = await db.rides.getByUser(driver.id);
+      setRides(data.filter(r => r.status === RideStatus.COMPLETED));
+      setLoading(false);
+    };
+    fetchRides();
+  }, [driver.id]);
+
+  const earningsData = useMemo(() => {
+    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    const dataMap: Record<string, number> = days.reduce((acc, day) => ({ ...acc, [day]: 0 }), {});
+    
+    // Last 7 days aggregation
+    rides.forEach(ride => {
+      const date = new Date(ride.createdAt);
+      const dayName = days[date.getDay()];
+      dataMap[dayName] += ride.fare;
+    });
+
+    return days.map(day => ({ name: day, amount: dataMap[day] }));
+  }, [rides]);
 
   return (
     <main className="p-10 space-y-10 animate-in fade-in duration-500 overflow-y-auto h-full pb-32">
@@ -51,9 +72,9 @@ const DriverOverview: React.FC<{ driver: Driver, isOnline: boolean, toggleOnline
 
       <div className="grid md:grid-cols-3 gap-8">
         {[
-          { label: 'Successful Trips', value: '342', color: 'bg-emerald-50 text-emerald-600', icon: CheckCircle },
+          { label: 'Successful Trips', value: rides.length.toString(), color: 'bg-emerald-50 text-emerald-600', icon: CheckCircle },
           { label: 'Active Rating', value: driver.rating.toString(), color: 'bg-indigo-50 text-indigo-600', icon: Star },
-          { label: 'Total KM', value: '2,840', color: 'bg-blue-50 text-blue-600', icon: Navigation },
+          { label: 'Total KM', value: rides.reduce((acc, r) => acc + r.distance, 0).toFixed(1), color: 'bg-blue-50 text-blue-600', icon: Navigation },
         ].map((stat, i) => (
           <div key={i} className="bg-white p-8 rounded-[40px] shadow-sm border border-slate-50 flex items-center space-x-6 hover:shadow-xl transition-all duration-500">
             <div className={`${stat.color} p-5 rounded-3xl`}><stat.icon className="w-8 h-8" /></div>
@@ -65,15 +86,22 @@ const DriverOverview: React.FC<{ driver: Driver, isOnline: boolean, toggleOnline
       <div className="bg-white p-10 rounded-[40px] shadow-sm border border-slate-50">
         <h3 className="text-2xl font-black text-slate-900 mb-8">Revenue Analytics</h3>
         <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={earningsData}>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-              <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontWeight: 700}} />
-              <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontWeight: 700}} />
-              <Tooltip contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'}} />
-              <Area type="monotone" dataKey="amount" stroke="#3b82f6" strokeWidth={5} fill="#3b82f633" />
-            </AreaChart>
-          </ResponsiveContainer>
+          {loading ? (
+            <div className="flex items-center justify-center h-full"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
+          ) : (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={earningsData}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontWeight: 700}} />
+                <YAxis axisLine={false} tickLine={false} tick={{fill: '#94a3b8', fontWeight: 700}} />
+                <Tooltip 
+                  contentStyle={{borderRadius: '24px', border: 'none', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.1)'}}
+                  formatter={(value: any) => [`₦${value.toLocaleString()}`, 'Earnings']}
+                />
+                <Area type="monotone" dataKey="amount" stroke="#3b82f6" strokeWidth={5} fill="#3b82f633" />
+              </AreaChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
     </main>
@@ -81,6 +109,30 @@ const DriverOverview: React.FC<{ driver: Driver, isOnline: boolean, toggleOnline
 };
 
 const DriverEarnings: React.FC<{ driver: Driver }> = ({ driver }) => {
+  const [rides, setRides] = useState<RideRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchRides = async () => {
+      const data = await db.rides.getByUser(driver.id);
+      setRides(data.reverse()); // Latest first
+      setLoading(false);
+    };
+    fetchRides();
+  }, [driver.id]);
+
+  const earningsToday = useMemo(() => {
+    const today = new Date().toDateString();
+    return rides
+      .filter(r => new Date(r.createdAt).toDateString() === today && r.status === RideStatus.COMPLETED)
+      .reduce((acc, r) => acc + r.fare, 0);
+  }, [rides]);
+
+  const tripsToday = useMemo(() => {
+    const today = new Date().toDateString();
+    return rides.filter(r => new Date(r.createdAt).toDateString() === today && r.status === RideStatus.COMPLETED).length;
+  }, [rides]);
+
   return (
     <main className="p-10 space-y-10 animate-in slide-in-from-right-10 duration-500 overflow-y-auto h-full pb-32">
       <div className="flex justify-between items-center">
@@ -98,14 +150,14 @@ const DriverEarnings: React.FC<{ driver: Driver }> = ({ driver }) => {
            <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Earnings Today</p>
            <div className="flex items-center space-x-2">
               <TrendingUp className="text-emerald-500 w-6 h-6" />
-              <p className="text-3xl font-black text-slate-900">₦18,450.00</p>
+              <p className="text-3xl font-black text-slate-900">₦{earningsToday.toLocaleString()}</p>
            </div>
         </div>
         <div className="bg-white p-10 rounded-[50px] border border-slate-100 flex flex-col justify-center">
-           <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Completed Trips</p>
+           <p className="text-xs font-black uppercase tracking-[0.3em] text-slate-400 mb-2">Completed Today</p>
            <div className="flex items-center space-x-2">
               <Calendar className="text-blue-500 w-6 h-6" />
-              <p className="text-3xl font-black text-slate-900">14 Trips</p>
+              <p className="text-3xl font-black text-slate-900">{tripsToday} Trips</p>
            </div>
         </div>
       </div>
@@ -116,18 +168,30 @@ const DriverEarnings: React.FC<{ driver: Driver }> = ({ driver }) => {
           <button className="text-blue-600 font-black text-xs uppercase tracking-widest hover:underline">Download CSV</button>
         </div>
         <div className="space-y-2 p-6">
-           {[1,2,3,4,5].map(i => (
-             <div key={i} className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl hover:bg-slate-100 transition group cursor-pointer">
-                <div className="flex items-center space-x-4">
-                   <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-emerald-500 shadow-sm"><ArrowUpRight className="w-6 h-6" /></div>
-                   <div>
-                      <p className="font-black text-slate-900">Trip Fare Credit</p>
-                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Oct {10+i}, 2026 • 15:3{i} PM</p>
-                   </div>
-                </div>
-                <p className="text-xl font-black text-slate-900">+₦{(2400 + i * 150).toLocaleString()}</p>
-             </div>
-           ))}
+           {loading ? (
+             <div className="text-center py-10 text-slate-400 font-bold">Synchronizing records...</div>
+           ) : rides.length === 0 ? (
+             <div className="text-center py-10 text-slate-400 font-bold">No completed trips found in history.</div>
+           ) : (
+             rides.map(ride => (
+               <div key={ride.id} className="flex items-center justify-between p-6 bg-slate-50 rounded-3xl hover:bg-slate-100 transition group cursor-pointer">
+                  <div className="flex items-center space-x-4">
+                     <div className={`w-12 h-12 bg-white rounded-2xl flex items-center justify-center ${ride.status === RideStatus.COMPLETED ? 'text-emerald-500' : 'text-slate-400'} shadow-sm`}>
+                       <ArrowUpRight className="w-6 h-6" />
+                     </div>
+                     <div>
+                        <p className="font-black text-slate-900">{ride.status === RideStatus.COMPLETED ? 'Trip Fare Credit' : `Trip ${ride.status}`}</p>
+                        <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">
+                          {new Date(ride.createdAt).toLocaleDateString()} • {new Date(ride.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                        </p>
+                     </div>
+                  </div>
+                  <p className="text-xl font-black text-slate-900">
+                    {ride.status === RideStatus.COMPLETED ? '+' : ''}₦{ride.fare.toLocaleString()}
+                  </p>
+               </div>
+             ))
+           )}
         </div>
       </div>
     </main>
@@ -251,8 +315,8 @@ const DriverSettings: React.FC<{ driver: Driver }> = ({ driver }) => {
                     <span className="text-emerald-500 font-black text-xs uppercase tracking-widest">Active</span>
                  </div>
                  <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl">
-                    <span className="text-xs font-black uppercase tracking-widest opacity-60">Trips Today</span>
-                    <span className="text-blue-400 font-black text-xs uppercase tracking-widest">12 Completed</span>
+                    <span className="text-xs font-black uppercase tracking-widest opacity-60">Trips Total</span>
+                    <span className="text-blue-400 font-black text-xs uppercase tracking-widest">{driver.balance > 0 ? 'Verified' : 'Pending'}</span>
                  </div>
               </div>
            </div>
@@ -265,7 +329,7 @@ const DriverSettings: React.FC<{ driver: Driver }> = ({ driver }) => {
 const DriverDashboard: React.FC = () => {
   const { currentUser, logout, refreshUser } = useApp();
   const driver = currentUser as Driver;
-  const [isOnline, setIsOnline] = useState(driver.isOnline);
+  const [isOnline, setIsOnline] = useState(driver?.isOnline || false);
   const [activeRequest, setActiveRequest] = useState<any>(null);
 
   const toggleOnline = async () => {
@@ -291,6 +355,8 @@ const DriverDashboard: React.FC = () => {
     { to: '/driver/docs', icon: Shield, label: 'Documents' },
     { to: '/driver/profile', icon: UserIcon, label: 'Settings' },
   ];
+
+  if (!driver) return null;
 
   return (
     <div className="min-h-screen bg-slate-50 flex overflow-hidden">
