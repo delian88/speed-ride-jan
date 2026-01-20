@@ -31,9 +31,9 @@ class MockDatabase {
       await this.delay(100);
       try {
         const data = localStorage.getItem(this.prefix + 'settings');
-        return data ? JSON.parse(data) : { pricePerKm: 350 };
+        return data ? JSON.parse(data) : { pricePerKm: 2000 };
       } catch {
-        return { pricePerKm: 350 };
+        return { pricePerKm: 2000 };
       }
     },
     update: async (updates: { pricePerKm: number }): Promise<void> => {
@@ -174,7 +174,7 @@ class MockDatabase {
     }
     
     if (!localStorage.getItem(this.prefix + 'settings')) {
-      this.set('settings', { pricePerKm: 350 });
+      this.set('settings', { pricePerKm: 2000 });
     }
   }
 }

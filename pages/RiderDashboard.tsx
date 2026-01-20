@@ -20,11 +20,11 @@ const RiderExplore: React.FC = () => {
   const { currentUser } = useApp();
   const [rideStep, setRideStep] = useState<'INPUT' | 'MATCHING' | 'ON_RIDE'>('INPUT');
   const [rideStatus, setRideStatus] = useState<RideStatus>(RideStatus.REQUESTED);
-  const [pickup, setPickup] = useState('123 Main St, New York, NY');
+  const [pickup, setPickup] = useState('My Location');
   const [dropoff, setDropoff] = useState('');
   const [distance, setDistance] = useState(0);
   const [selectedType, setSelectedType] = useState<VehicleType>(VehicleType.ECONOMY);
-  const [pricePerKm, setPricePerKm] = useState(350);
+  const [pricePerKm, setPricePerKm] = useState(2000); // Updated to 2000/km
   const [eta, setEta] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<'WALLET' | 'CARD'>('WALLET');
 
@@ -43,7 +43,7 @@ const RiderExplore: React.FC = () => {
     const bounds = new google.maps.LatLngBounds();
     let hasCoords = false;
     
-    if (pickupMarkerRef.current?.getPosition() && pickup) {
+    if (pickupMarkerRef.current?.getPosition() && pickup && pickup !== 'My Location') {
       bounds.extend(pickupMarkerRef.current.getPosition());
       hasCoords = true;
     }
@@ -54,7 +54,7 @@ const RiderExplore: React.FC = () => {
 
     if (hasCoords) {
       mapRef.current.fitBounds(bounds, { top: 100, bottom: 100, left: 100, right: 100 });
-      if (!dropoff || !pickup) {
+      if (!dropoff || !pickup || pickup === 'My Location') {
         setTimeout(() => mapRef.current.setZoom(15), 100);
       }
     }
@@ -82,13 +82,13 @@ const RiderExplore: React.FC = () => {
   };
 
   useEffect(() => {
-    db.settings.get().then(s => setPricePerKm(s?.pricePerKm || 350));
+    db.settings.get().then(s => setPricePerKm(s?.pricePerKm || 2000));
 
     const initMap = () => {
       if (mapContainerRef.current && typeof google !== 'undefined' && google.maps) {
         mapRef.current = new google.maps.Map(mapContainerRef.current, {
-          center: { lat: 40.7128, lng: -74.0060 }, // NYC
-          zoom: 13,
+          center: { lat: 6.5244, lng: 3.3792 }, // Lagos, Nigeria
+          zoom: 12,
           disableDefaultUI: true,
           styles: [
             { featureType: "all", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
@@ -128,7 +128,12 @@ const RiderExplore: React.FC = () => {
         });
 
         if (google.maps.places) {
-          const pAuto = new google.maps.places.Autocomplete(pickupInputRef.current);
+          const autocompleteOptions = {
+            componentRestrictions: { country: "NG" },
+            fields: ["formatted_address", "geometry", "name"],
+          };
+
+          const pAuto = new google.maps.places.Autocomplete(pickupInputRef.current, autocompleteOptions);
           pAuto.addListener('place_changed', () => {
             const place = pAuto.getPlace();
             if (place.geometry) {
@@ -140,7 +145,7 @@ const RiderExplore: React.FC = () => {
             }
           });
 
-          const dAuto = new google.maps.places.Autocomplete(dropoffInputRef.current);
+          const dAuto = new google.maps.places.Autocomplete(dropoffInputRef.current, autocompleteOptions);
           dAuto.addListener('place_changed', () => {
             const place = dAuto.getPlace();
             if (place.geometry) {
@@ -148,8 +153,17 @@ const RiderExplore: React.FC = () => {
               dropoffMarkerRef.current.setPosition(place.geometry.location);
               dropoffMarkerRef.current.setMap(mapRef.current);
               updateMapBounds();
-              if (pickup) getRoute(pickup, place.formatted_address || place.name);
+              if (pickup && pickup !== 'My Location') getRoute(pickup, place.formatted_address || place.name);
             }
+          });
+        }
+
+        // Try to get actual user position
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition((pos) => {
+            const center = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+            mapRef.current.setCenter(center);
+            pickupMarkerRef.current.setPosition(center);
           });
         }
       }
@@ -167,10 +181,12 @@ const RiderExplore: React.FC = () => {
 
   const calculateFare = (type: VehicleType) => {
     const multipliers: Record<string, number> = {
-      [VehicleType.ECONOMY]: 1.0, [VehicleType.PREMIUM]: 2.1, [VehicleType.XL]: 2.5, [VehicleType.BIKE]: 0.6
+      [VehicleType.ECONOMY]: 1.0, [VehicleType.PREMIUM]: 1.5, [VehicleType.XL]: 2.0, [VehicleType.BIKE]: 0.5
     };
     const multiplier = multipliers[type] || 1.0;
-    return Math.max(distance * pricePerKm * multiplier, 500);
+    // Calculate fare based on 2000/km as requested
+    const calculated = distance * pricePerKm * multiplier;
+    return Math.max(calculated, 500); // Minimum 500 NGN
   };
 
   const currentFare = calculateFare(selectedType);
@@ -234,29 +250,32 @@ const RiderExplore: React.FC = () => {
           {/* Vehicle Selection */}
           <div className="grid grid-cols-3 gap-3">
             {[
-              { type: VehicleType.ECONOMY, label: 'Economy', price: 12.50, time: 5, img: 'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?w=200&q=80' },
-              { type: VehicleType.PREMIUM, label: 'Premium', price: 25.80, time: 3, img: 'https://images.unsplash.com/photo-1555215695-3004980ad54e?w=200&q=80' },
-              { type: VehicleType.XL, label: 'SUV', price: 30.20, time: 6, img: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=200&q=80' }
-            ].map((v) => (
-              <div 
-                key={v.type}
-                onClick={() => setSelectedType(v.type)}
-                className={`cursor-pointer rounded-xl border-2 transition-all overflow-hidden ${selectedType === v.type ? 'border-blue-600 bg-blue-50/20 ring-4 ring-blue-50' : 'border-slate-100 hover:border-slate-200'}`}
-              >
-                <div className="h-16 relative overflow-hidden bg-slate-100">
-                  <img src={v.img} className="w-full h-full object-cover" />
-                  {selectedType === v.type && (
-                    <div className="absolute top-1 right-1 bg-blue-600 text-white rounded-full p-0.5">
-                      <CheckCircle className="w-3 h-3" />
-                    </div>
-                  )}
+              { type: VehicleType.ECONOMY, label: 'Economy', base: 1.0, time: 5, img: 'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?w=200&q=80' },
+              { type: VehicleType.PREMIUM, label: 'Premium', base: 1.5, time: 3, img: 'https://images.unsplash.com/photo-1555215695-3004980ad54e?w=200&q=80' },
+              { type: VehicleType.XL, label: 'SUV', base: 2.0, time: 6, img: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=200&q=80' }
+            ].map((v) => {
+              const vFare = calculateFare(v.type);
+              return (
+                <div 
+                  key={v.type}
+                  onClick={() => setSelectedType(v.type)}
+                  className={`cursor-pointer rounded-xl border-2 transition-all overflow-hidden ${selectedType === v.type ? 'border-blue-600 bg-blue-50/20 ring-4 ring-blue-50' : 'border-slate-100 hover:border-slate-200'}`}
+                >
+                  <div className="h-16 relative overflow-hidden bg-slate-100">
+                    <img src={v.img} className="w-full h-full object-cover" />
+                    {selectedType === v.type && (
+                      <div className="absolute top-1 right-1 bg-blue-600 text-white rounded-full p-0.5">
+                        <CheckCircle className="w-3 h-3" />
+                      </div>
+                    )}
+                  </div>
+                  <div className={`p-3 text-center ${selectedType === v.type ? 'bg-blue-600 text-white' : 'bg-white'}`}>
+                    <p className="text-[10px] font-black uppercase tracking-widest">{v.label}</p>
+                    <p className="text-xs font-bold mt-1">₦{Math.round(vFare).toLocaleString()} • {v.time}m</p>
+                  </div>
                 </div>
-                <div className={`p-3 text-center ${selectedType === v.type ? 'bg-blue-600 text-white' : 'bg-white'}`}>
-                  <p className="text-[10px] font-black uppercase tracking-widest">{v.label}</p>
-                  <p className="text-xs font-bold mt-1">₦{(currentFare * (v.price/12.5)).toLocaleString()} • {v.time} min</p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Fare Details */}
@@ -267,20 +286,16 @@ const RiderExplore: React.FC = () => {
             </div>
             <div className="space-y-3">
               <div className="flex justify-between text-sm">
-                <span className="text-slate-400 font-medium">Base Fare</span>
-                <span className="font-bold text-slate-900">₦500.00</span>
+                <span className="text-slate-400 font-medium">Distance</span>
+                <span className="font-bold text-slate-900">{distance.toFixed(2)} KM</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-slate-400 font-medium">Distance & Time</span>
-                <span className="font-bold text-slate-900">₦{(currentFare * 0.8).toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-400 font-medium">Service Fee</span>
-                <span className="font-bold text-slate-900">₦{(currentFare * 0.1).toLocaleString()}</span>
+                <span className="text-slate-400 font-medium">Rate (₦)</span>
+                <span className="font-bold text-slate-900">₦{pricePerKm.toLocaleString()} / KM</span>
               </div>
               <div className="flex justify-between items-center pt-2">
                 <span className="text-slate-900 font-black text-sm">Estimated Total</span>
-                <span className="text-xl font-black text-slate-900">₦{currentFare.toLocaleString()}</span>
+                <span className="text-xl font-black text-slate-900">₦{Math.round(currentFare).toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -307,13 +322,12 @@ const RiderExplore: React.FC = () => {
                 <span className="text-xs font-black">Card **** 1234</span>
               </button>
             </div>
-            <button className="text-blue-600 text-[10px] font-black uppercase tracking-widest hover:underline">Add Payment Method</button>
           </div>
 
           {/* Action Button */}
           <button 
             onClick={confirmRide}
-            disabled={!pickup || !dropoff}
+            disabled={!pickup || !dropoff || distance === 0}
             className="w-full py-5 bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl shadow-slate-200 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-30 disabled:grayscale"
           >
             {rideStep === 'MATCHING' ? 'Synchronizing Node...' : 'Confirm Ride'}
@@ -334,25 +348,7 @@ const RiderExplore: React.FC = () => {
           <button onClick={() => updateMapBounds()} className="p-4 bg-white rounded-2xl shadow-2xl border border-slate-100 hover:bg-slate-50 transition text-slate-400 hover:text-blue-600">
             <RefreshCw className="w-6 h-6" />
           </button>
-          <button className="p-4 bg-blue-600 rounded-2xl shadow-2xl text-white hover:bg-blue-700 transition">
-            <Zap className="w-6 h-6" />
-          </button>
         </div>
-
-        {/* Route Info Overlay (Matching) */}
-        {rideStep === 'MATCHING' && (
-          <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-900/10 backdrop-blur-sm pointer-events-none">
-            <div className="bg-white p-10 rounded-[40px] shadow-2xl flex flex-col items-center space-y-6 animate-in zoom-in duration-500">
-              <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center animate-pulse">
-                <Search className="w-10 h-10" />
-              </div>
-              <div className="text-center">
-                <p className="text-2xl font-black text-slate-900 tracking-tight">Finding Your Pilot</p>
-                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Connecting to available fleet nodes...</p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -361,6 +357,25 @@ const RiderExplore: React.FC = () => {
 const RiderDashboard: React.FC = () => {
   const { logout, currentUser } = useApp();
   const navigate = useNavigate();
+  const [currentCity, setCurrentCity] = useState('Locating...');
+
+  useEffect(() => {
+    if (navigator.geolocation && typeof google !== 'undefined') {
+      navigator.geolocation.getCurrentPosition((pos) => {
+        const geocoder = new google.maps.Geocoder();
+        const latlng = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        geocoder.geocode({ location: latlng }, (results: any, status: any) => {
+          if (status === "OK" && results[0]) {
+            // Find city/state in address components
+            const city = results[0].address_components.find((c: any) => c.types.includes("locality"))?.long_name 
+                      || results[0].address_components.find((c: any) => c.types.includes("administrative_area_level_1"))?.long_name
+                      || "Nigeria";
+            setCurrentCity(city);
+          }
+        });
+      }, () => setCurrentCity("Nigeria"));
+    }
+  }, []);
 
   if (!currentUser) return null;
   
@@ -372,7 +387,7 @@ const RiderDashboard: React.FC = () => {
           <Logo className="h-10 w-auto brightness-0 invert" />
           <div className="hidden md:flex items-center space-x-3 bg-white/5 px-6 py-3 rounded-xl border border-white/5 cursor-pointer hover:bg-white/10 transition">
             <MapPin className="w-4 h-4 text-blue-500" />
-            <span className="text-xs font-black">New York, NY</span>
+            <span className="text-xs font-black">{currentCity}</span>
             <ChevronDown className="w-3 h-3 text-white/40" />
           </div>
         </div>
@@ -421,7 +436,6 @@ const RiderDashboard: React.FC = () => {
   );
 };
 
-// Simplified sub-views for demonstration based on previous high-quality logic
 const RiderHistory: React.FC = () => {
   const { currentUser } = useApp();
   const [rides, setRides] = useState<any[]>([]);
