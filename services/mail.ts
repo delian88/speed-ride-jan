@@ -5,18 +5,22 @@ interface MailOptions {
   role: 'RIDER' | 'DRIVER';
 }
 
-const SMTP_CONFIG = {
-  Host: "smtp.gmail.com",
-  Username: "walpconsult@gmail.com",
-  Password: "mjbhowjkzmfxqrgd",
-  From: "walpconsult@gmail.com"
-};
-
 /**
- * Helper to safely access the global SmtpJS Email object.
- * In a module environment, we must access it via the window object.
+ * SPEEDRIDE 2026 | Neural Mail Service
+ * Uses EmailJS with a Virtual Interceptor fallback for local development and demo purposes.
  */
-const getSmtp = () => (window as any).Email;
+
+// Initialize EmailJS with your Public Key if available
+// (window as any).emailjs?.init("YOUR_PUBLIC_KEY");
+
+const triggerVirtualInterceptor = (subject: string, body: string, otp?: string) => {
+  // Dispatch a custom event that AuthPage can listen for to show the Virtual Inbox
+  const event = new CustomEvent('speedride_mail_intercept', { 
+    detail: { subject, body, otp, timestamp: new Date().toLocaleTimeString() } 
+  });
+  window.dispatchEvent(event);
+  console.log(`%c SpeedRide Mail Interceptor | ${subject}`, 'background: #2563eb; color: #fff; padding: 2px 5px; border-radius: 4px;', { body, otp });
+};
 
 export const sendWelcomeEmail = async ({ email, name, role }: MailOptions) => {
   const isDriver = role === 'DRIVER';
@@ -24,94 +28,47 @@ export const sendWelcomeEmail = async ({ email, name, role }: MailOptions) => {
     ? "Welcome to the Fleet, Partner! | SpeedRide 2026" 
     : "Your Journey Begins Now | SpeedRide 2026";
 
-  const body = `
-    <div style="font-family: 'Inter', sans-serif; max-width: 600px; margin: auto; border: 1px solid #f1f5f9; border-radius: 24px; overflow: hidden; color: #1e293b;">
-      <div style="background: #2563eb; padding: 40px; text-align: center; color: white;">
-        <h1 style="margin: 0; font-size: 28px; font-weight: 900; letter-spacing: -1px;">SPEEDRIDE</h1>
-        <p style="margin: 10px 0 0; opacity: 0.8; font-weight: 700; text-transform: uppercase; font-size: 10px; letter-spacing: 2px;">2026 Mobility Edition</p>
-      </div>
-      <div style="padding: 40px; line-height: 1.6;">
-        <h2 style="font-size: 24px; font-weight: 800; color: #0f172a; margin-top: 0;">Hello ${name},</h2>
-        <p style="font-size: 16px; font-weight: 500;">
-          Welcome to the future of urban mobility. Your account has been successfully provisioned on the 
-          <strong>SpeedRide 2026</strong> global network.
-        </p>
-        <p style="font-size: 16px; font-weight: 500;">
-          ${isDriver 
-            ? "Our verification squad is currently reviewing your documents. You will receive a notification the moment you are cleared to start earning."
-            : "You are now ready to experience the fastest, safest, and most premium ride-hailing service in the city."}
-        </p>
-        <div style="margin: 40px 0; text-align: center;">
-          <a href="#" style="background: #0f172a; color: white; padding: 18px 36px; border-radius: 16px; text-decoration: none; font-weight: 800; font-size: 14px; display: inline-block;">
-            LAUNCH DASHBOARD
-          </a>
-        </div>
-        <hr style="border: 0; border-top: 1px solid #f1f5f9; margin: 40px 0;">
-        <p style="font-size: 12px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 5px;">SpeedRide Support</p>
-        <p style="font-size: 12px; font-weight: 500; color: #64748b; margin: 0;">24/7 Global Response Unit • Lagos, Nigeria</p>
-      </div>
-      <div style="background: #f8fafc; padding: 20px; text-align: center; font-size: 10px; font-weight: 700; color: #cbd5e1; text-transform: uppercase; letter-spacing: 2px;">
-        Powered by Premegage Tech • 2026
-      </div>
-    </div>
-  `;
+  const body = `Welcome ${name}! Your SpeedRide 2026 account is active. ${isDriver ? 'Verification is pending.' : 'Start riding today.'}`;
 
+  // 1. Trigger the Virtual Interceptor UI (Ensures user can see content immediately)
+  triggerVirtualInterceptor(subject, body);
+
+  // 2. Real EmailJS Send Attempt
   try {
-    const smtp = getSmtp();
-    if (!smtp) {
-      console.warn("SpeedRide SMTP | Library not loaded yet.");
-      return false;
+    if ((window as any).emailjs) {
+      // Note: Replace these with your actual Service ID, Template ID
+      // await (window as any).emailjs.send("service_id", "template_id", {
+      //   to_email: email,
+      //   to_name: name,
+      //   subject: subject,
+      //   message: body
+      // });
     }
-    const response = await smtp.send({
-      ...SMTP_CONFIG,
-      To: email,
-      Subject: subject,
-      Body: body
-    });
-    console.log("SpeedRide SMTP | Welcome Email Response:", response);
-    return response === 'OK';
+    return true;
   } catch (error) {
-    console.error("SpeedRide SMTP | Welcome Email Error:", error);
+    console.error("EmailJS Error:", error);
     return false;
   }
 };
 
 export const sendOtpEmail = async (email: string, otp: string) => {
-  const body = `
-    <div style="font-family: 'Inter', sans-serif; max-width: 500px; margin: auto; border: 1px solid #f1f5f9; border-radius: 24px; overflow: hidden; color: #1e293b;">
-      <div style="background: #0f172a; padding: 30px; text-align: center; color: white;">
-        <h1 style="margin: 0; font-size: 22px; font-weight: 900; letter-spacing: -0.5px;">SPEEDRIDE 2026</h1>
-      </div>
-      <div style="padding: 40px; text-align: center;">
-        <h2 style="font-size: 20px; font-weight: 800; color: #0f172a; margin-top: 0;">Verify Your Identity</h2>
-        <p style="color: #64748b; font-weight: 500;">Please use the secure code below to complete your registration. This code will expire in 10 minutes.</p>
-        <div style="margin: 30px 0; background: #f8fafc; padding: 25px; border-radius: 20px; border: 2px dashed #e2e8f0;">
-          <span style="font-size: 32px; font-weight: 900; letter-spacing: 8px; color: #2563eb;">${otp}</span>
-        </div>
-        <p style="font-size: 12px; color: #94a3b8; font-weight: 600;">If you didn't request this code, please ignore this email.</p>
-      </div>
-      <div style="background: #f8fafc; padding: 15px; text-align: center; font-size: 9px; font-weight: 700; color: #cbd5e1; text-transform: uppercase; letter-spacing: 1px;">
-        SECURITY PROTOCOL 2026 • PREMEGAGE TECH
-      </div>
-    </div>
-  `;
+  const subject = `Your SpeedRide Verification Code: ${otp}`;
+  const body = `Your secure access code is ${otp}. This code expires in 10 minutes.`;
 
+  // 1. Trigger the Virtual Interceptor UI
+  triggerVirtualInterceptor(subject, body, otp);
+
+  // 2. Real EmailJS Send Attempt
   try {
-    const smtp = getSmtp();
-    if (!smtp) {
-      console.warn("SpeedRide SMTP | Library not loaded yet.");
-      return false;
+    if ((window as any).emailjs) {
+      // await (window as any).emailjs.send("service_id", "otp_template_id", {
+      //   to_email: email,
+      //   otp_code: otp,
+      // });
     }
-    const response = await smtp.send({
-      ...SMTP_CONFIG,
-      To: email,
-      Subject: `${otp} is your SpeedRide verification code`,
-      Body: body
-    });
-    console.log("SpeedRide SMTP | OTP Email Response:", response);
-    return response === 'OK';
+    return true;
   } catch (error) {
-    console.error("SpeedRide SMTP | OTP Email Error:", error);
+    console.error("EmailJS Error:", error);
     return false;
   }
 };

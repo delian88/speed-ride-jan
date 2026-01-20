@@ -7,11 +7,19 @@ import { sendWelcomeEmail, sendOtpEmail } from '../services/mail';
 import { 
   Mail, Lock, Phone, User as UserIcon, Shield, 
   ChevronRight, Zap, ChevronLeft,
-  FileText, Car, Smartphone, AlertCircle, Upload, CheckCircle as CheckCircleIcon, Image as ImageIcon
+  FileText, Car, Smartphone, AlertCircle, Upload, CheckCircle as CheckCircleIcon, Image as ImageIcon,
+  Wifi, Info
 } from 'lucide-react';
 import Logo from '../components/Logo';
 
 type AuthView = 'LOGIN' | 'SIGNUP' | 'OTP' | 'FORGOT' | 'RESET' | 'SUCCESS';
+
+interface InterceptedMail {
+  subject: string;
+  body: string;
+  otp?: string;
+  timestamp: string;
+}
 
 const AuthPage: React.FC = () => {
   const [view, setView] = useState<AuthView>('LOGIN');
@@ -31,19 +39,30 @@ const AuthPage: React.FC = () => {
   const [correctOtp, setCorrectOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  
+  // Virtual Mail Interceptor State
+  const [interceptedMail, setInterceptedMail] = useState<InterceptedMail | null>(null);
 
   const { login } = useApp();
   const navigate = useNavigate();
 
+  useEffect(() => {
+    const handleMailIntercept = (e: any) => {
+      setInterceptedMail(e.detail);
+      // Auto-dismiss after 8 seconds
+      setTimeout(() => setInterceptedMail(null), 8000);
+    };
+    window.addEventListener('speedride_mail_intercept', handleMailIntercept);
+    return () => window.removeEventListener('speedride_mail_intercept', handleMailIntercept);
+  }, []);
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'licenseDoc' | 'ninDoc') => {
     const file = e.target.files?.[0];
     if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+    if (file.size > 5 * 1024 * 1024) {
       setError("File is too large. Maximum size is 5MB.");
       return;
     }
-
     const reader = new FileReader();
     reader.onloadend = () => {
       setFormData(prev => ({ ...prev, [field]: reader.result as string }));
@@ -78,13 +97,9 @@ const AuthPage: React.FC = () => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validation for Drivers
-    if (role === 'DRIVER') {
-      if (!formData.licenseDoc || !formData.ninDoc) {
-        setError("Please upload both Driver's License and NIN for verification.");
-        return;
-      }
+    if (role === 'DRIVER' && (!formData.licenseDoc || !formData.ninDoc)) {
+      setError("Please upload both Driver's License and NIN for verification.");
+      return;
     }
 
     setIsLoading(true);
@@ -99,14 +114,7 @@ const AuthPage: React.FC = () => {
       
       const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
       setCorrectOtp(newOtp);
-      console.log("SpeedRide Debug | Generated OTP:", newOtp);
-      
-      sendOtpEmail(formData.email, newOtp).then(success => {
-        if (!success) {
-          console.warn("SpeedRide Debug | SMTP failed. Using fallback OTP in console.");
-        }
-      });
-      
+      await sendOtpEmail(formData.email, newOtp);
       setView('OTP');
     } catch (err) {
       setError("Registration flow failed.");
@@ -118,7 +126,7 @@ const AuthPage: React.FC = () => {
   const handleVerifyOtp = async () => {
     const enteredOtp = otp.join('');
     if (enteredOtp !== correctOtp) {
-      setError("Invalid verification code. Please check your email.");
+      setError("Invalid verification code. Please check the interceptor at the top.");
       return;
     }
 
@@ -143,7 +151,7 @@ const AuthPage: React.FC = () => {
       });
 
       if (role !== 'ADMIN') {
-        sendWelcomeEmail({
+        await sendWelcomeEmail({
           email: formData.email,
           name: formData.name,
           role: role as 'RIDER' | 'DRIVER'
@@ -183,7 +191,7 @@ const AuthPage: React.FC = () => {
               <Logo className="h-12 w-auto" />
             </div>
             <h2 className="text-3xl font-black text-slate-900">Verified!</h2>
-            <p className="text-slate-500 font-bold">Account created successfully. A welcome email has been dispatched to your inbox.</p>
+            <p className="text-slate-500 font-bold">Account created successfully. A welcome transmission has been intercepted.</p>
           </div>
         );
 
@@ -191,13 +199,13 @@ const AuthPage: React.FC = () => {
         return (
           <div className="space-y-8 text-center animate-in fade-in duration-500">
             <div className="bg-blue-100 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-6">
-              <Mail className="text-blue-600 w-8 h-8" />
+              <Wifi className="text-blue-600 w-8 h-8 animate-pulse" />
             </div>
-            <h2 className="text-2xl font-black text-slate-900">Verify Identity</h2>
+            <h2 className="text-2xl font-black text-slate-900">Verify Transmission</h2>
             <div className="text-slate-500 font-medium leading-relaxed px-4 space-y-2">
-              <p>We've sent a 6-digit secure code to your email:</p>
+              <p>Intercepting secure code for:</p>
               <p className="text-slate-900 font-black py-1 px-3 bg-blue-50 rounded-lg inline-block">{formData.email}</p>
-              <p className="text-xs">Please enter it below to proceed.</p>
+              <p className="text-xs text-blue-600 font-bold uppercase tracking-widest animate-pulse">Check the mail interceptor above</p>
             </div>
             <div className="flex justify-center space-x-2">
               {otp.map((digit, i) => (
@@ -215,7 +223,6 @@ const AuthPage: React.FC = () => {
             >
               {isLoading ? "Validating Code..." : "Verify & Sign In"}
             </button>
-            <p className="text-sm font-bold text-slate-400">Didn't get the email? <button onClick={() => sendOtpEmail(formData.email, correctOtp)} className="text-blue-600 hover:underline">Resend Code</button></p>
           </div>
         );
 
@@ -260,64 +267,25 @@ const AuthPage: React.FC = () => {
                 </div>
                 
                 <div className="grid grid-cols-2 gap-4">
-                  {/* License Upload */}
                   <div className="relative group">
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      id="license-upload" 
-                      className="hidden" 
-                      onChange={(e) => handleFileUpload(e, 'licenseDoc')}
-                    />
-                    <label 
-                      htmlFor="license-upload" 
-                      className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${formData.licenseDoc ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200 hover:border-blue-400 hover:bg-blue-50'}`}
-                    >
-                      {formData.licenseDoc ? (
-                        <>
-                          <CheckCircleIcon className="w-6 h-6 text-emerald-500 mb-1" />
-                          <span className="text-[10px] font-black text-emerald-600 uppercase">License OK</span>
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="w-6 h-6 text-slate-400 mb-1" />
-                          <span className="text-[10px] font-black text-slate-400 uppercase">License</span>
-                        </>
-                      )}
+                    <input type="file" accept="image/*" id="license-upload" className="hidden" onChange={(e) => handleFileUpload(e, 'licenseDoc')} />
+                    <label htmlFor="license-upload" className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${formData.licenseDoc ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200 hover:border-blue-400 hover:bg-blue-50'}`}>
+                      {formData.licenseDoc ? <CheckCircleIcon className="w-6 h-6 text-emerald-500 mb-1" /> : <Upload className="w-6 h-6 text-slate-400 mb-1" />}
+                      <span className="text-[10px] font-black text-slate-400 uppercase">{formData.licenseDoc ? 'License OK' : 'License'}</span>
                     </label>
                   </div>
-
-                  {/* NIN Upload */}
                   <div className="relative group">
-                    <input 
-                      type="file" 
-                      accept="image/*" 
-                      id="nin-upload" 
-                      className="hidden" 
-                      onChange={(e) => handleFileUpload(e, 'ninDoc')}
-                    />
-                    <label 
-                      htmlFor="nin-upload" 
-                      className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${formData.ninDoc ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200 hover:border-blue-400 hover:bg-blue-50'}`}
-                    >
-                      {formData.ninDoc ? (
-                        <>
-                          <CheckCircleIcon className="w-6 h-6 text-emerald-500 mb-1" />
-                          <span className="text-[10px] font-black text-emerald-600 uppercase">NIN OK</span>
-                        </>
-                      ) : (
-                        <>
-                          <Smartphone className="w-6 h-6 text-slate-400 mb-1" />
-                          <span className="text-[10px] font-black text-slate-400 uppercase">NIN ID</span>
-                        </>
-                      )}
+                    <input type="file" accept="image/*" id="nin-upload" className="hidden" onChange={(e) => handleFileUpload(e, 'ninDoc')} />
+                    <label htmlFor="nin-upload" className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${formData.ninDoc ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200 hover:border-blue-400 hover:bg-blue-50'}`}>
+                      {formData.ninDoc ? <CheckCircleIcon className="w-6 h-6 text-emerald-500 mb-1" /> : <Smartphone className="w-6 h-6 text-slate-400 mb-1" />}
+                      <span className="text-[10px] font-black text-slate-400 uppercase">{formData.ninDoc ? 'NIN OK' : 'NIN ID'}</span>
                     </label>
                   </div>
                 </div>
               </div>
             )}
             {error && <div className="flex items-center space-x-2 text-red-600 text-sm font-bold bg-red-50 p-4 rounded-xl"><AlertCircle className="w-4 h-4" /> <span>{error}</span></div>}
-            <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition shadow-xl" disabled={isLoading}>{isLoading ? "Connecting to Mail Server..." : "Continue to Verify"}</button>
+            <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition shadow-xl" disabled={isLoading}>{isLoading ? "Connecting to Mail Node..." : "Connect & Verify"}</button>
             <p className="text-center font-bold text-slate-400">Already a member? <button type="button" onClick={() => setView('LOGIN')} className="text-blue-600">Sign In</button></p>
           </form>
         );
@@ -356,6 +324,31 @@ const AuthPage: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6 relative overflow-hidden">
+      {/* VIRTUAL MAIL INTERCEPTOR UI */}
+      {interceptedMail && (
+        <div className="fixed top-6 left-1/2 -translate-x-1/2 w-full max-w-lg z-[200] animate-slide-top px-4">
+           <div className="bg-slate-900 text-white p-6 rounded-[32px] shadow-2xl border-2 border-blue-500/50 backdrop-blur-xl relative overflow-hidden">
+              <div className="absolute top-0 right-0 p-4"><div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div></div>
+              <div className="flex items-center space-x-4 mb-4">
+                <div className="p-3 bg-blue-600 rounded-2xl"><Mail className="w-6 h-6" /></div>
+                <div>
+                   <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Neural Transmission Intercepted</p>
+                   <p className="text-sm font-black">{interceptedMail.subject}</p>
+                </div>
+              </div>
+              <div className="bg-white/5 p-4 rounded-2xl border border-white/10 mb-4">
+                 <p className="text-xs text-slate-300 font-medium leading-relaxed">{interceptedMail.body}</p>
+              </div>
+              {interceptedMail.otp && (
+                <div className="flex items-center justify-between">
+                   <div className="flex items-center space-x-2"><Zap className="w-4 h-4 text-yellow-400" /><span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Secure Access Code</span></div>
+                   <span className="text-2xl font-black text-blue-400 tracking-[0.2em]">{interceptedMail.otp}</span>
+                </div>
+              )}
+           </div>
+        </div>
+      )}
+
       <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-100/50 rounded-full blur-[120px] -z-10"></div>
       <div className="max-w-md w-full bg-white rounded-[40px] shadow-2xl border border-white p-10">
         <div className="flex flex-col items-center justify-center mb-10">
@@ -363,12 +356,7 @@ const AuthPage: React.FC = () => {
         </div>
         {renderView()}
         <div className="mt-10 pt-6 border-t border-slate-50 text-center">
-           <a 
-            href="https://www.premegagetech.com" 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-blue-600 transition"
-           >
+           <a href="https://www.premegagetech.com" target="_blank" rel="noopener noreferrer" className="text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-blue-600 transition">
             Powered by Premegage Tech
            </a>
         </div>
