@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef, ReactNode } from 'react';
+import React, { useState, useEffect, useRef, ReactNode, Component } from 'react';
 import { Routes, Route, NavLink } from 'react-router-dom';
 import { 
   MapPin, Navigation, History, Wallet, LogOut,
@@ -21,8 +21,8 @@ interface ErrorBoundaryState {
   error: any;
 }
 
-// Fix: Explicitly extend React.Component to resolve TypeScript inheritance issues where setState and props might not be recognized
-class DashboardErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// Fix: Inherit from Component explicitly to ensure setState and props are correctly typed
+class DashboardErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = {
     hasError: false,
     error: null
@@ -46,26 +46,26 @@ class DashboardErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBo
             </div>
             <h1 className="text-3xl font-black text-slate-900 mb-3 tracking-tighter">Interface Collision</h1>
             <p className="text-slate-500 font-bold mb-8 text-sm leading-relaxed">
-              The neural map encountered a DOM conflict. This usually happens when the browser's graphics engine loses synchronization.
+              The neural map encountered a DOM conflict. We've isolated the graphics engine to prevent further synchronization issues.
             </p>
             <div className="bg-slate-900 text-blue-400 p-5 rounded-2xl text-[11px] font-mono text-left mb-8 overflow-x-auto border border-blue-500/20">
                {this.state.error?.message || "Internal Node Error"}
             </div>
             <button 
               onClick={() => {
-                // Fix: setState is now correctly available on the class instance through React.Component
+                // Fix: setState is now recognized from the base Component class
                 this.setState({ hasError: false, error: null });
                 window.location.reload();
               }} 
               className="w-full bg-blue-600 text-white font-black py-5 rounded-2xl hover:bg-blue-700 transition-all active:scale-95 shadow-xl shadow-blue-200"
             >
-              Recalibrate Interface
+              Reboot Graphics Engine
             </button>
           </div>
         </div>
       );
     }
-    // Fix: props is now correctly available on the class instance through React.Component
+    // Fix: props is now recognized from the base Component class
     return this.props.children;
   }
 }
@@ -86,7 +86,7 @@ const RiderExplore: React.FC = () => {
   const [activeRide, setActiveRide] = useState<RideRequest | null>(null);
   const [eta, setEta] = useState<number | null>(null);
 
-  // Using refs for map objects to prevent React from trying to manage Map internal nodes
+  // Core Map Refs
   const mapRef = useRef<any>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const directionsRendererRef = useRef<any>(null);
@@ -95,20 +95,21 @@ const RiderExplore: React.FC = () => {
     db.settings.get().then(s => setPricePerKm(s?.pricePerKm || 350));
 
     let attempts = 0;
-    const maxAttempts = 3;
+    const maxAttempts = 5;
 
     const tryInitMap = () => {
+      // CRITICAL: mapContainerRef.current MUST stay empty for Google Maps to take over.
       if (mapContainerRef.current && typeof google !== 'undefined' && google.maps) {
         try {
-          // Initialize map once
           if (!mapRef.current) {
             mapRef.current = new google.maps.Map(mapContainerRef.current, {
               center: { lat: 6.5244, lng: 3.3792 },
               zoom: 14,
               disableDefaultUI: true,
               styles: [
-                { featureType: "all", elementType: "labels.text.fill", stylers: [{ color: "#94a3b8" }] },
-                { featureType: "water", elementType: "geometry", stylers: [{ color: "#f1f5f9" }] }
+                { featureType: "all", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
+                { featureType: "water", elementType: "geometry", stylers: [{ color: "#e2e8f0" }] },
+                { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#f8fafc" }] }
               ]
             });
             directionsRendererRef.current = new google.maps.DirectionsRenderer({ suppressMarkers: false });
@@ -116,13 +117,13 @@ const RiderExplore: React.FC = () => {
           }
           setIsApiLoading(false);
         } catch (e) {
-          console.warn("Map Init Failed:", e);
+          console.warn("Telemetry Initialization Failed:", e);
           setIsManualMode(true);
           setIsApiLoading(false);
         }
       } else if (attempts < maxAttempts) {
         attempts++;
-        setTimeout(tryInitMap, 1000);
+        setTimeout(tryInitMap, 800);
       } else {
         setIsManualMode(true);
         setIsApiLoading(false);
@@ -131,10 +132,11 @@ const RiderExplore: React.FC = () => {
 
     tryInitMap();
 
-    // Cleanup to prevent React from trying to remove children of map div
     return () => {
-      if (directionsRendererRef.current) directionsRendererRef.current.setMap(null);
-      mapRef.current = null;
+      // Graceful cleanup
+      if (directionsRendererRef.current) {
+        directionsRendererRef.current.setMap(null);
+      }
     };
   }, []);
 
@@ -163,38 +165,50 @@ const RiderExplore: React.FC = () => {
   };
 
   return (
-    <div className="h-full relative overflow-hidden bg-slate-50">
-      {/* Map Container is kept strictly separated from React logic */}
+    <div className="h-full relative overflow-hidden bg-slate-100">
+      {/* 
+        MAP LAYER: 
+        This div MUST be empty and React MUST never put children inside it. 
+        Google Maps will manage this node's children exclusively.
+      */}
       <div 
         ref={mapContainerRef} 
-        className="absolute inset-0 z-0 bg-slate-100 flex items-center justify-center transition-opacity duration-700"
-        style={{ opacity: isApiLoading ? 0.5 : 1 }}
-      >
-        {isApiLoading && !isManualMode && (
-          <div className="text-slate-400 flex flex-col items-center">
-            <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4"></div>
-            <p className="font-black uppercase tracking-widest text-[10px]">Initializing Neural Grid...</p>
-          </div>
-        )}
-        {isManualMode && (
-          <div className="text-slate-300 flex flex-col items-center scale-110">
-            <MapPin className="w-16 h-16 mb-4 opacity-10 animate-pulse" />
-            <p className="text-[10px] font-black uppercase tracking-[0.3em] opacity-30">Offline Intelligence Active</p>
-          </div>
-        )}
-      </div>
+        className="absolute inset-0 z-0 bg-slate-100"
+      />
 
-      <div className={`absolute top-10 left-10 w-full max-w-sm z-10 space-y-4 transition-all duration-700 ${rideStep === 'ON_RIDE' ? '-translate-x-full opacity-0 scale-95' : 'translate-x-0 opacity-100 scale-100'}`}>
-        <div className="bg-white/95 backdrop-blur-md p-8 rounded-[40px] shadow-2xl border border-white">
+      {/* 
+        OVERLAY LAYER: 
+        All loading, manual mode, and UI states go here, SIBLING to the map container.
+      */}
+      {(isApiLoading || isManualMode) && (
+        <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-50/50 backdrop-blur-sm pointer-events-none">
+          {isApiLoading && !isManualMode && (
+            <div className="flex flex-col items-center">
+              <div className="w-14 h-14 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4 shadow-xl"></div>
+              <p className="font-black uppercase tracking-[0.3em] text-[10px] text-slate-400">Initializing Neural Mesh...</p>
+            </div>
+          )}
+          {isManualMode && (
+            <div className="text-slate-300 flex flex-col items-center animate-fade-in">
+              <MapPin className="w-16 h-16 mb-4 opacity-10 animate-pulse" />
+              <p className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30">Static Telemetry Active</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* INPUT INTERFACE */}
+      <div className={`absolute top-10 left-10 w-full max-w-sm z-20 space-y-4 transition-all duration-700 ease-out ${rideStep === 'ON_RIDE' ? '-translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'}`}>
+        <div className="bg-white/95 backdrop-blur-xl p-8 rounded-[40px] shadow-2xl border border-white">
            <div className="flex items-center space-x-3 mb-8">
               <Logo className="h-10 w-auto" />
               <div className="h-6 w-px bg-slate-100" />
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rider Hub</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rider Portal</p>
            </div>
            
            <div className="space-y-4">
              <div className="relative group">
-               <div className="absolute left-5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-blue-500 group-focus-within:animate-ping"></div>
+               <div className="absolute left-5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-blue-500"></div>
                <input 
                  placeholder="Starting Point" 
                  value={pickup} onChange={e => setPickup(e.target.value)}
@@ -204,7 +218,7 @@ const RiderExplore: React.FC = () => {
              <div className="relative group">
                <div className="absolute left-5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-slate-400"></div>
                <input 
-                 placeholder="Destination" 
+                 placeholder="Where to?" 
                  value={dropoff} onChange={e => setDropoff(e.target.value)}
                  className="w-full pl-12 pr-5 py-5 bg-slate-50 border-none rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-600 transition"
                />
@@ -214,47 +228,50 @@ const RiderExplore: React.FC = () => {
                disabled={!pickup || !dropoff}
                className="w-full bg-slate-900 text-white font-black py-5 rounded-3xl hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50 shadow-xl shadow-slate-200"
              >
-               Analyze Routes
+               Confirm Path
              </button>
            </div>
         </div>
       </div>
 
+      {/* RIDE SELECTION / MATCHING / PROGRESS */}
       {rideStep !== 'INPUT' && (
-        <div className="absolute bottom-10 left-6 right-6 md:left-10 md:right-10 max-w-2xl mx-auto z-20">
-          <div className="bg-white p-8 rounded-[50px] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.15)] border border-white">
+        <div className="absolute bottom-10 left-6 right-6 md:left-10 md:right-10 max-w-2xl mx-auto z-30">
+          <div className="bg-white p-8 rounded-[50px] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.15)] border border-white animate-in slide-in-from-bottom-20 duration-500">
             {rideStep === 'MATCHING' ? (
               <div className="py-12 text-center space-y-6">
-                 <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden mx-auto"><div className="bg-blue-600 h-full animate-loading-bar" /></div>
-                 <p className="text-xl font-black text-slate-900 tracking-tight">Syncing with Elite Fleet...</p>
-                 <p className="text-xs text-slate-400 font-bold uppercase tracking-widest">Optimizing Pickup ETA</p>
+                 <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden mx-auto">
+                    <div className="bg-blue-600 h-full animate-loading-bar" />
+                 </div>
+                 <p className="text-xl font-black text-slate-900 tracking-tight">Broadcasting to Fleet...</p>
+                 <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Optimizing ETA Matrix</p>
               </div>
             ) : rideStep === 'ON_RIDE' ? (
-              <div className="animate-in slide-in-from-bottom-10 duration-500">
+              <div className="animate-in fade-in duration-700">
                  <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center space-x-5">
-                       <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center font-black text-xl shadow-inner">SR</div>
+                       <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-[24px] flex items-center justify-center font-black text-xl shadow-inner border border-blue-100">SR</div>
                        <div>
                           <p className="font-black text-slate-900 text-xl tracking-tight">Adebayo Tunde</p>
-                          <p className="text-xs text-slate-400 font-black uppercase tracking-[0.2em] mt-1">Tesla Model 3 • LAG-777</p>
+                          <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-1">Tesla Partner • LAG-777</p>
                        </div>
                     </div>
                     <div className="text-right">
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Arrival In</p>
-                       <p className="text-4xl font-black text-blue-600 tracking-tighter">{eta}<span className="text-lg ml-0.5">m</span></p>
+                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Pick Up</p>
+                       <p className="text-4xl font-black text-blue-600 tracking-tighter">{eta}<span className="text-lg ml-1 font-bold">m</span></p>
                     </div>
                  </div>
                  <div className="flex space-x-4">
                     <button className="flex-1 py-5 bg-slate-50 text-slate-600 font-black rounded-2xl hover:bg-slate-100 transition flex items-center justify-center space-x-2">
-                       <Phone className="w-5 h-5" /> <span>Call</span>
+                       <Phone className="w-5 h-5" /> <span>Call Pilot</span>
                     </button>
-                    <button onClick={() => setRideStep('INPUT')} className="flex-1 py-5 bg-red-50 text-red-600 font-black rounded-2xl hover:bg-red-100 transition shadow-sm">Terminate</button>
+                    <button onClick={() => setRideStep('INPUT')} className="flex-1 py-5 bg-red-50 text-red-600 font-black rounded-2xl hover:bg-red-100 transition">Abort Request</button>
                  </div>
               </div>
             ) : (
               <div className="space-y-8">
                  <div className="flex justify-between items-center">
-                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">Available Nodes</h3>
+                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">Select Node</h3>
                     <button onClick={() => setRideStep('INPUT')} className="p-3 bg-slate-50 text-slate-400 hover:text-slate-900 rounded-2xl transition"><X className="w-6 h-6" /></button>
                  </div>
                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -271,7 +288,7 @@ const RiderExplore: React.FC = () => {
                     ))}
                  </div>
                  <button onClick={confirmRide} className="w-full bg-blue-600 text-white font-black py-6 rounded-3xl hover:bg-blue-700 transition-all active:scale-95 shadow-[0_20px_40px_-12px_rgba(37,99,235,0.4)] uppercase tracking-[0.2em] text-xs">
-                   Request {selectedType}
+                   Activate {selectedType} Path
                  </button>
               </div>
             )}
@@ -289,11 +306,11 @@ const RiderHistory: React.FC = () => {
   
   return (
     <div className="p-10 space-y-8 overflow-y-auto h-full pb-32">
-      <h2 className="text-4xl font-black text-slate-900 tracking-tight">Trip Logs</h2>
+      <h2 className="text-4xl font-black text-slate-900 tracking-tight">Telemetry History</h2>
       {rides.length === 0 ? (
         <div className="py-20 text-center bg-white rounded-[40px] border border-slate-100 shadow-sm">
            <History className="w-16 h-16 text-slate-100 mx-auto mb-4" />
-           <p className="text-slate-400 font-black uppercase tracking-widest text-xs">No active telemetry logs</p>
+           <p className="text-slate-400 font-black uppercase tracking-widest text-[10px]">No historical data found</p>
         </div>
       ) : (
         <div className="grid gap-4">
@@ -312,7 +329,7 @@ const RiderHistory: React.FC = () => {
               </div>
               <div className="text-right">
                  <p className="text-2xl font-black text-slate-900 tracking-tighter">₦{(r.fare || 0).toLocaleString()}</p>
-                 <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest">Captured</p>
+                 <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest">Settled</p>
               </div>
             </div>
           ))}
@@ -353,7 +370,7 @@ const RiderProfile: React.FC = () => {
              <div className="w-28 h-28 rounded-[40px] overflow-hidden bg-slate-100 border-4 border-slate-50 shadow-2xl">
                 <img src={currentUser?.avatar || `https://i.pravatar.cc/150?u=${currentUser?.id}`} className="w-full h-full object-cover" alt="Profile" />
              </div>
-             <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-white p-2 rounded-xl border-4 border-white"><ShieldCheck className="w-5 h-5" /></div>
+             <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-white p-2 rounded-xl border-4 border-white shadow-lg"><ShieldCheck className="w-5 h-5" /></div>
           </div>
           <div>
              <p className="text-3xl font-black text-slate-900 tracking-tighter">{currentUser?.name || 'Speed Rider'}</p>
@@ -394,10 +411,10 @@ const RiderDashboard: React.FC = () => {
           </div>
           <nav className="flex-1 space-y-2 px-6">
             {[
-              { to: '/rider', icon: Navigation, label: 'Neural Path', end: true },
-              { to: '/rider/history', icon: History, label: 'Trip Logs' },
+              { to: '/rider', icon: Navigation, label: 'Move Now', end: true },
+              { to: '/rider/history', icon: History, label: 'History' },
               { to: '/rider/wallet', icon: Wallet, label: 'Wallet Hub' },
-              { to: '/rider/profile', icon: UserIcon, label: 'Identity Node' },
+              { to: '/rider/profile', icon: UserIcon, label: 'Identity' },
             ].map((item) => (
               <NavLink 
                 key={item.to} to={item.to} end={item.end}
@@ -411,7 +428,7 @@ const RiderDashboard: React.FC = () => {
           <div className="px-6">
              <button onClick={logout} className="flex items-center justify-center md:space-x-5 w-full p-5 rounded-[24px] text-red-400 hover:bg-red-50 transition-all font-black text-[10px] uppercase tracking-[0.2em]">
                 <LogOut className="w-6 h-6 shrink-0" />
-                <span className="hidden md:block">Terminate Session</span>
+                <span className="hidden md:block">Terminate</span>
              </button>
           </div>
         </div>
