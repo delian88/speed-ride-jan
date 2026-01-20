@@ -34,6 +34,8 @@ export interface Driver extends User {
   plateNumber: string;
   isOnline: boolean;
   isVerified: boolean;
+  licenseDoc?: string; // Base64 representation
+  ninDoc?: string;     // Base64 representation
 }
 
 export interface RideRequest {

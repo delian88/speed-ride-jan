@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../App';
 import { db } from '../database';
@@ -7,7 +7,7 @@ import { sendWelcomeEmail, sendOtpEmail } from '../services/mail';
 import { 
   Mail, Lock, Phone, User as UserIcon, Shield, 
   ChevronRight, Zap, ChevronLeft,
-  FileText, Car, Smartphone, AlertCircle
+  FileText, Car, Smartphone, AlertCircle, Upload, CheckCircle as CheckCircleIcon, Image as ImageIcon
 } from 'lucide-react';
 import Logo from '../components/Logo';
 
@@ -23,7 +23,9 @@ const AuthPage: React.FC = () => {
     name: '',
     vehicleModel: '',
     plateNumber: '',
-    vehicleType: 'ECONOMY'
+    vehicleType: 'ECONOMY',
+    licenseDoc: '',
+    ninDoc: ''
   });
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const [correctOtp, setCorrectOtp] = useState('');
@@ -33,8 +35,20 @@ const AuthPage: React.FC = () => {
   const { login } = useApp();
   const navigate = useNavigate();
 
-  const generateOtp = () => {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'licenseDoc' | 'ninDoc') => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB limit
+      setError("File is too large. Maximum size is 5MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setFormData(prev => ({ ...prev, [field]: reader.result as string }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -64,6 +78,15 @@ const AuthPage: React.FC = () => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validation for Drivers
+    if (role === 'DRIVER') {
+      if (!formData.licenseDoc || !formData.ninDoc) {
+        setError("Please upload both Driver's License and NIN for verification.");
+        return;
+      }
+    }
+
     setIsLoading(true);
     setError('');
     try {
@@ -74,7 +97,7 @@ const AuthPage: React.FC = () => {
         return;
       }
       
-      const newOtp = generateOtp();
+      const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
       setCorrectOtp(newOtp);
       console.log("SpeedRide Debug | Generated OTP:", newOtp);
       
@@ -113,7 +136,9 @@ const AuthPage: React.FC = () => {
           plateNumber: formData.plateNumber,
           vehicleType: formData.vehicleType as any,
           isOnline: false,
-          isVerified: false
+          isVerified: false,
+          licenseDoc: formData.licenseDoc,
+          ninDoc: formData.ninDoc
         } : {})
       });
 
@@ -233,9 +258,61 @@ const AuthPage: React.FC = () => {
                     <input name="plateNumber" placeholder="Plate Number" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none" />
                   </div>
                 </div>
-                <div className="p-4 border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50 text-center">
-                   <p className="text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">Driver's License & NIN</p>
-                   <label className="bg-slate-900 text-white px-4 py-2 rounded-lg text-[10px] font-black cursor-pointer hover:bg-blue-600 transition">Upload Verification Docs</label>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  {/* License Upload */}
+                  <div className="relative group">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      id="license-upload" 
+                      className="hidden" 
+                      onChange={(e) => handleFileUpload(e, 'licenseDoc')}
+                    />
+                    <label 
+                      htmlFor="license-upload" 
+                      className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${formData.licenseDoc ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200 hover:border-blue-400 hover:bg-blue-50'}`}
+                    >
+                      {formData.licenseDoc ? (
+                        <>
+                          <CheckCircleIcon className="w-6 h-6 text-emerald-500 mb-1" />
+                          <span className="text-[10px] font-black text-emerald-600 uppercase">License OK</span>
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="w-6 h-6 text-slate-400 mb-1" />
+                          <span className="text-[10px] font-black text-slate-400 uppercase">License</span>
+                        </>
+                      )}
+                    </label>
+                  </div>
+
+                  {/* NIN Upload */}
+                  <div className="relative group">
+                    <input 
+                      type="file" 
+                      accept="image/*" 
+                      id="nin-upload" 
+                      className="hidden" 
+                      onChange={(e) => handleFileUpload(e, 'ninDoc')}
+                    />
+                    <label 
+                      htmlFor="nin-upload" 
+                      className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${formData.ninDoc ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200 hover:border-blue-400 hover:bg-blue-50'}`}
+                    >
+                      {formData.ninDoc ? (
+                        <>
+                          <CheckCircleIcon className="w-6 h-6 text-emerald-500 mb-1" />
+                          <span className="text-[10px] font-black text-emerald-600 uppercase">NIN OK</span>
+                        </>
+                      ) : (
+                        <>
+                          <Smartphone className="w-6 h-6 text-slate-400 mb-1" />
+                          <span className="text-[10px] font-black text-slate-400 uppercase">NIN ID</span>
+                        </>
+                      )}
+                    </label>
+                  </div>
                 </div>
               </div>
             )}

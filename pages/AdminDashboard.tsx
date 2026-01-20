@@ -4,101 +4,192 @@ import { Routes, Route, NavLink } from 'react-router-dom';
 import { 
   Users, Car, TrendingUp, AlertCircle, ShieldCheck, 
   Settings, Search, X, Map, LayoutDashboard, 
-  Database, PieChart, LogOut, ShieldAlert, CheckCircle, Check
+  Database, PieChart, LogOut, ShieldAlert, CheckCircle, Check, Eye, FileText, Image as ImageIcon
 } from 'lucide-react';
 import { useApp } from '../App';
 import { db } from '../database';
 import { Driver } from '../types';
 
-const AdminOverview: React.FC<{ stats: any, pendingDrivers: Driver[], handleVerification: (id: string, app: boolean) => void, loading: boolean }> = ({ stats, pendingDrivers, handleVerification, loading }) => (
-  <main className="p-12 space-y-12 animate-in fade-in duration-500">
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
-      {[
-        { label: 'Active Sessions', value: stats.activeRides.toLocaleString(), change: '+12%', icon: Car },
-        { label: 'Gross Revenue', value: '₦' + (stats.revenue/1000000).toFixed(1) + 'M', change: '+8%', icon: TrendingUp },
-        { label: 'New Partners', value: stats.newUsers.toString(), change: '+24%', icon: Users },
-        { label: 'System Alerts', value: stats.alerts.toString(), icon: AlertCircle },
-      ].map((stat, i) => (
-        <div key={i} className="bg-white p-8 rounded-[40px] shadow-sm border border-slate-50 hover:shadow-2xl transition duration-500">
-          <div className="flex justify-between items-start mb-6">
-            <div className="p-4 rounded-2xl bg-blue-50 text-blue-600">
-              <stat.icon className="w-7 h-7" />
-            </div>
-            {stat.change && <span className="text-xs font-black text-emerald-500 bg-emerald-50 px-3 py-1 rounded-full">{stat.change}</span>}
-          </div>
-          <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">{stat.label}</p>
-          <p className="text-4xl font-black text-slate-900 tracking-tight">{stat.value}</p>
-        </div>
-      ))}
-    </div>
+const AdminOverview: React.FC<{ stats: any, pendingDrivers: Driver[], handleVerification: (id: string, app: boolean) => void, loading: boolean }> = ({ stats, pendingDrivers, handleVerification, loading }) => {
+  const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
 
-    <div className="bg-white rounded-[40px] shadow-sm border border-slate-50 overflow-hidden">
-      <div className="p-10 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
-        <div className="flex items-center space-x-4">
-           <ShieldAlert className="w-8 h-8 text-blue-600" />
-           <div>
-              <h3 className="text-2xl font-black text-slate-900">Partner Verification</h3>
-              <p className="text-slate-500 font-bold text-sm">Review pending driver applications for compliance.</p>
+  return (
+    <main className="p-12 space-y-12 animate-in fade-in duration-500">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        {[
+          { label: 'Active Sessions', value: stats.activeRides.toLocaleString(), change: '+12%', icon: Car },
+          { label: 'Gross Revenue', value: '₦' + (stats.revenue/1000000).toFixed(1) + 'M', change: '+8%', icon: TrendingUp },
+          { label: 'New Partners', value: stats.newUsers.toString(), change: '+24%', icon: Users },
+          { label: 'System Alerts', value: stats.alerts.toString(), icon: AlertCircle },
+        ].map((stat, i) => (
+          <div key={i} className="bg-white p-8 rounded-[40px] shadow-sm border border-slate-50 hover:shadow-2xl transition duration-500">
+            <div className="flex justify-between items-start mb-6">
+              <div className="p-4 rounded-2xl bg-blue-50 text-blue-600">
+                <stat.icon className="w-7 h-7" />
+              </div>
+              {stat.change && <span className="text-xs font-black text-emerald-500 bg-emerald-50 px-3 py-1 rounded-full">{stat.change}</span>}
+            </div>
+            <p className="text-xs font-black text-slate-400 uppercase tracking-widest mb-2">{stat.label}</p>
+            <p className="text-4xl font-black text-slate-900 tracking-tight">{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-white rounded-[40px] shadow-sm border border-slate-50 overflow-hidden">
+        <div className="p-10 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
+          <div className="flex items-center space-x-4">
+             <ShieldAlert className="w-8 h-8 text-blue-600" />
+             <div>
+                <h3 className="text-2xl font-black text-slate-900">Partner Verification</h3>
+                <p className="text-slate-500 font-bold text-sm">Review pending driver applications for compliance.</p>
+             </div>
+          </div>
+          <span className="bg-blue-600 text-white text-xs font-black px-4 py-2 rounded-xl shadow-lg shadow-blue-500/20">{pendingDrivers.length} PENDING</span>
+        </div>
+        <div className="overflow-x-auto">
+          {loading ? (
+            <div className="p-20 text-center"><div className="animate-spin h-10 w-10 border-t-2 border-blue-600 rounded-full mx-auto"></div></div>
+          ) : pendingDrivers.length === 0 ? (
+            <div className="p-20 text-center space-y-4">
+               <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto" />
+               <p className="text-xl font-black text-slate-900">Queue Clear!</p>
+               <p className="text-slate-500 font-bold">All driver applications have been processed.</p>
+            </div>
+          ) : (
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
+                  <th className="px-10 py-6">Applicant Profile</th>
+                  <th className="px-10 py-6">Hardware Details</th>
+                  <th className="px-10 py-6">Documents</th>
+                  <th className="px-10 py-6 text-right">Decision</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-50">
+                {pendingDrivers.map((driver) => (
+                  <tr key={driver.id} className="hover:bg-slate-50 transition group">
+                    <td className="px-10 py-8">
+                      <div className="flex items-center space-x-4">
+                         <img src={driver.avatar} className="w-14 h-14 rounded-2xl border-4 border-white shadow-md" />
+                         <div>
+                            <p className="font-black text-slate-900 leading-none mb-1">{driver.name}</p>
+                            <p className="text-xs text-slate-400 font-bold">{driver.email}</p>
+                         </div>
+                      </div>
+                    </td>
+                    <td className="px-10 py-8">
+                       <div className="bg-white px-4 py-2 rounded-xl border border-slate-100 w-fit">
+                         <p className="text-xs font-black text-slate-900">{driver.vehicleModel}</p>
+                         <p className="text-[10px] font-black text-blue-600 tracking-widest uppercase">{driver.plateNumber}</p>
+                       </div>
+                    </td>
+                    <td className="px-10 py-8">
+                       <button 
+                        onClick={() => setSelectedDriver(driver)}
+                        className="flex items-center space-x-2 text-blue-600 font-black text-xs hover:underline uppercase tracking-widest"
+                       >
+                         <Eye className="w-4 h-4" />
+                         <span>View Docs</span>
+                       </button>
+                    </td>
+                    <td className="px-10 py-8 text-right">
+                       <div className="flex items-center justify-end space-x-3">
+                         <button 
+                            onClick={() => handleVerification(driver.id, true)}
+                            className="px-6 py-3 bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition"
+                         >
+                            APPROVE
+                         </button>
+                         <button className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition"><X className="w-6 h-6" /></button>
+                       </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+
+      {/* Document Preview Modal */}
+      {selectedDriver && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-12">
+           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setSelectedDriver(null)}></div>
+           <div className="relative w-full max-w-4xl bg-white rounded-[50px] shadow-2xl border border-white p-10 max-h-[90vh] overflow-y-auto animate-in zoom-in duration-300">
+              <button 
+                onClick={() => setSelectedDriver(null)}
+                className="absolute top-8 right-8 p-3 bg-slate-100 hover:bg-red-50 hover:text-red-500 rounded-2xl transition"
+              >
+                <X className="w-6 h-6" />
+              </button>
+              
+              <div className="flex items-center space-x-6 mb-12">
+                 <img src={selectedDriver.avatar} className="w-20 h-20 rounded-3xl border-4 border-slate-50" />
+                 <div>
+                    <h3 className="text-3xl font-black text-slate-900">{selectedDriver.name}</h3>
+                    <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">Partner Verification ID: {selectedDriver.id}</p>
+                 </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-12">
+                 <div className="space-y-6">
+                    <div className="flex items-center space-x-3">
+                       <ShieldCheck className="w-6 h-6 text-blue-600" />
+                       <h4 className="font-black text-xl text-slate-900">Driver's License</h4>
+                    </div>
+                    <div className="aspect-[3/2] bg-slate-100 rounded-[32px] overflow-hidden border-2 border-slate-50 shadow-inner group relative">
+                       {selectedDriver.licenseDoc ? (
+                         <img src={selectedDriver.licenseDoc} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt="License" />
+                       ) : (
+                         <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                           <FileText className="w-12 h-12 mb-2" />
+                           <p className="font-bold">No Image Uploaded</p>
+                         </div>
+                       )}
+                    </div>
+                 </div>
+                 
+                 <div className="space-y-6">
+                    <div className="flex items-center space-x-3">
+                       <Users className="w-6 h-6 text-blue-600" />
+                       <h4 className="font-black text-xl text-slate-900">National ID (NIN)</h4>
+                    </div>
+                    <div className="aspect-[3/2] bg-slate-100 rounded-[32px] overflow-hidden border-2 border-slate-50 shadow-inner group relative">
+                       {selectedDriver.ninDoc ? (
+                         <img src={selectedDriver.ninDoc} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt="NIN" />
+                       ) : (
+                         <div className="flex flex-col items-center justify-center h-full text-slate-400">
+                           <ImageIcon className="w-12 h-12 mb-2" />
+                           <p className="font-bold">No Image Uploaded</p>
+                         </div>
+                       )}
+                    </div>
+                 </div>
+              </div>
+
+              <div className="mt-12 pt-10 border-t border-slate-100 flex justify-end space-x-4">
+                 <button 
+                  onClick={() => setSelectedDriver(null)}
+                  className="px-10 py-5 bg-slate-100 text-slate-600 font-black rounded-2xl hover:bg-slate-200 transition"
+                 >
+                   CLOSE PREVIEW
+                 </button>
+                 <button 
+                  onClick={() => {
+                    handleVerification(selectedDriver.id, true);
+                    setSelectedDriver(null);
+                  }}
+                  className="px-10 py-5 bg-blue-600 text-white font-black rounded-2xl hover:bg-blue-700 transition shadow-2xl shadow-blue-500/20"
+                 >
+                   APPROVE PARTNER
+                 </button>
+              </div>
            </div>
         </div>
-        <span className="bg-blue-600 text-white text-xs font-black px-4 py-2 rounded-xl shadow-lg shadow-blue-500/20">{pendingDrivers.length} PENDING</span>
-      </div>
-      <div className="overflow-x-auto">
-        {loading ? (
-          <div className="p-20 text-center"><div className="animate-spin h-10 w-10 border-t-2 border-blue-600 rounded-full mx-auto"></div></div>
-        ) : pendingDrivers.length === 0 ? (
-          <div className="p-20 text-center space-y-4">
-             <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto" />
-             <p className="text-xl font-black text-slate-900">Queue Clear!</p>
-             <p className="text-slate-500 font-bold">All driver applications have been processed.</p>
-          </div>
-        ) : (
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
-                <th className="px-10 py-6">Applicant Profile</th>
-                <th className="px-10 py-6">Hardware Details</th>
-                <th className="px-10 py-6 text-right">Decision</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-50">
-              {pendingDrivers.map((driver) => (
-                <tr key={driver.id} className="hover:bg-slate-50 transition group">
-                  <td className="px-10 py-8">
-                    <div className="flex items-center space-x-4">
-                       <img src={driver.avatar} className="w-14 h-14 rounded-2xl border-4 border-white shadow-md" />
-                       <div>
-                          <p className="font-black text-slate-900 leading-none mb-1">{driver.name}</p>
-                          <p className="text-xs text-slate-400 font-bold">{driver.email}</p>
-                       </div>
-                    </div>
-                  </td>
-                  <td className="px-10 py-8">
-                     <div className="bg-white px-4 py-2 rounded-xl border border-slate-100 w-fit">
-                       <p className="text-xs font-black text-slate-900">{driver.vehicleModel}</p>
-                       <p className="text-[10px] font-black text-blue-600 tracking-widest uppercase">{driver.plateNumber}</p>
-                     </div>
-                  </td>
-                  <td className="px-10 py-8 text-right">
-                     <div className="flex items-center justify-end space-x-3">
-                       <button 
-                          onClick={() => handleVerification(driver.id, true)}
-                          className="px-6 py-3 bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition"
-                       >
-                          APPROVE
-                       </button>
-                       <button className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition"><X className="w-6 h-6" /></button>
-                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
-    </div>
-  </main>
-);
+      )}
+    </main>
+  );
+};
 
 const AdminDashboard: React.FC = () => {
   const { logout } = useApp();
