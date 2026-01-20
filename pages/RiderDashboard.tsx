@@ -5,7 +5,9 @@ import {
   MapPin, Navigation, History, Wallet, LogOut,
   Car, Zap, Phone, User as UserIcon, CheckCircle, ChevronRight,
   Camera, Save, CreditCard, Plus, ShieldCheck, Mail, Star, X,
-  Search, Locate, Users, Clock, Shield, MoreHorizontal, AlertTriangle, AlertCircle
+  Search, Locate, Users, Clock, Shield, MoreHorizontal, AlertTriangle, AlertCircle,
+  // Fix: Added missing RefreshCw icon import
+  RefreshCw
 } from 'lucide-react';
 import { useApp } from '../App';
 import { RideStatus, VehicleType, User as UserType, RideRequest } from '../types';
@@ -21,8 +23,8 @@ interface ErrorBoundaryState {
   error: any;
 }
 
-// Fix: Use the named Component import directly to ensure setState and props are correctly inherited and typed
-class DashboardErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+// Fix: Explicitly using React.Component to ensure inheritance of setState and props is recognized by TypeScript
+class DashboardErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = {
     hasError: false,
     error: null
@@ -53,7 +55,7 @@ class DashboardErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundary
             </div>
             <button 
               onClick={() => {
-                // Use setState to reset error state
+                // Fix: setState is now correctly inherited from React.Component
                 this.setState({ hasError: false, error: null });
                 window.location.reload();
               }} 
@@ -65,7 +67,7 @@ class DashboardErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundary
         </div>
       );
     }
-    // Return children prop correctly
+    // Fix: props is now correctly inherited from React.Component
     return this.props.children;
   }
 }
@@ -75,6 +77,7 @@ declare var google: any;
 const RiderExplore: React.FC = () => {
   const { currentUser } = useApp();
   const [rideStep, setRideStep] = useState<'INPUT' | 'SELECTION' | 'MATCHING' | 'ON_RIDE'>('INPUT');
+  const [rideStatus, setRideStatus] = useState<RideStatus>(RideStatus.REQUESTED);
   const [pickup, setPickup] = useState('');
   const [dropoff, setDropoff] = useState('');
   const [distance, setDistance] = useState(0);
@@ -90,8 +93,6 @@ const RiderExplore: React.FC = () => {
   const directionsRendererRef = useRef<any>(null);
   const driverMarkerRef = useRef<any>(null);
   const pickupMarkerRef = useRef<any>(null);
-  const driverMarkerRef_2 = useRef<any>(null); // renamed to avoid potential duplicate (manual check)
-  const pickupMarkerRef_2 = useRef<any>(null); // renamed to avoid potential duplicate (manual check)
   const dropoffMarkerRef = useRef<any>(null);
   const animationRef = useRef<number | null>(null);
 
@@ -99,7 +100,6 @@ const RiderExplore: React.FC = () => {
   const pickupInputRef = useRef<HTMLInputElement>(null);
   const dropoffInputRef = useRef<HTMLInputElement>(null);
 
-  // Helper to adjust map bounds to show markers
   const updateMapBounds = () => {
     if (!mapRef.current) return;
     const bounds = new google.maps.LatLngBounds();
@@ -115,9 +115,8 @@ const RiderExplore: React.FC = () => {
     }
 
     if (hasCoords) {
-      mapRef.current.fitBounds(bounds, { top: 100, bottom: 100, left: 100, right: 100 });
-      // If only one marker, zoom out slightly from max fit
-      if (pickup && !dropoff || !pickup && dropoff) {
+      mapRef.current.fitBounds(bounds, { top: 120, bottom: 350, left: 100, right: 100 });
+      if ((pickup && !dropoff) || (!pickup && dropoff)) {
         setTimeout(() => mapRef.current.setZoom(15), 100);
       }
     }
@@ -135,7 +134,6 @@ const RiderExplore: React.FC = () => {
       },
       (result: any, status: any) => {
         if (status === 'OK') {
-          // Hide individual markers as renderer handles them
           if (pickupMarkerRef.current) pickupMarkerRef.current.setMap(null);
           if (dropoffMarkerRef.current) dropoffMarkerRef.current.setMap(null);
           
@@ -177,7 +175,6 @@ const RiderExplore: React.FC = () => {
             });
             directionsRendererRef.current.setMap(mapRef.current);
 
-            // Setup Markers
             pickupMarkerRef.current = new google.maps.Marker({
               map: mapRef.current,
               icon: {
@@ -187,8 +184,7 @@ const RiderExplore: React.FC = () => {
                 fillOpacity: 1,
                 strokeColor: "white",
                 strokeWeight: 2,
-              },
-              title: "Pickup"
+              }
             });
 
             dropoffMarkerRef.current = new google.maps.Marker({
@@ -200,11 +196,9 @@ const RiderExplore: React.FC = () => {
                 fillOpacity: 1,
                 strokeColor: "white",
                 strokeWeight: 2,
-              },
-              title: "Dropoff"
+              }
             });
 
-            // Init Autocomplete
             if (google.maps.places) {
               const pAuto = new google.maps.places.Autocomplete(pickupInputRef.current);
               pAuto.addListener('place_changed', () => {
@@ -214,9 +208,7 @@ const RiderExplore: React.FC = () => {
                   pickupMarkerRef.current.setPosition(place.geometry.location);
                   pickupMarkerRef.current.setMap(mapRef.current);
                   updateMapBounds();
-                  // Trigger auto-route if we have both
-                  const currentDropoff = dropoffInputRef.current?.value;
-                  if (currentDropoff) getRoute(place.formatted_address || place.name, currentDropoff);
+                  if (dropoffInputRef.current?.value) getRoute(place.formatted_address || place.name, dropoffInputRef.current.value);
                 }
               });
               
@@ -228,9 +220,7 @@ const RiderExplore: React.FC = () => {
                   dropoffMarkerRef.current.setPosition(place.geometry.location);
                   dropoffMarkerRef.current.setMap(mapRef.current);
                   updateMapBounds();
-                  // Trigger auto-route if we have both
-                  const currentPickup = pickupInputRef.current?.value;
-                  if (currentPickup) getRoute(currentPickup, place.formatted_address || place.name);
+                  if (pickupInputRef.current?.value) getRoute(pickupInputRef.current.value, place.formatted_address || place.name);
                 }
               });
             }
@@ -267,11 +257,14 @@ const RiderExplore: React.FC = () => {
   const startSimulation = () => {
     if (isManualMode || !directionsRendererRef.current.getDirections()) {
       setRideStep('ON_RIDE');
+      setRideStatus(RideStatus.IN_PROGRESS);
       setEta(5);
       return;
     }
 
     setRideStep('ON_RIDE');
+    setRideStatus(RideStatus.ACCEPTED);
+    
     const directions = directionsRendererRef.current.getDirections();
     const path = directions.routes[0].overview_path;
     let step = 0;
@@ -296,6 +289,7 @@ const RiderExplore: React.FC = () => {
     const animate = () => {
       if (step >= path.length - 1) {
         setEta(0);
+        setRideStatus(RideStatus.COMPLETED);
         return;
       }
 
@@ -309,9 +303,16 @@ const RiderExplore: React.FC = () => {
         rotation: heading
       });
 
+      // Status Logic
+      const progress = step / path.length;
+      if (progress < 0.15) setRideStatus(RideStatus.ACCEPTED);
+      else if (progress < 0.35) setRideStatus(RideStatus.ARRIVING);
+      else if (progress < 0.95) setRideStatus(RideStatus.IN_PROGRESS);
+      else setRideStatus(RideStatus.COMPLETED);
+
       setEta(Math.ceil(((path.length - step) / path.length) * 15));
       step++;
-      animationRef.current = requestAnimationFrame(() => setTimeout(animate, 100));
+      animationRef.current = requestAnimationFrame(() => setTimeout(animate, 150));
     };
 
     animate();
@@ -320,14 +321,41 @@ const RiderExplore: React.FC = () => {
   const confirmRide = async () => {
     if (!currentUser) return;
     setRideStep('MATCHING');
+    setRideStatus(RideStatus.REQUESTED);
     setTimeout(() => {
       startSimulation();
     }, 3000);
   };
 
+  const getStatusDisplay = () => {
+    switch(rideStatus) {
+      case RideStatus.REQUESTED: return { label: 'Syncing Request', color: 'bg-slate-900', icon: Search };
+      case RideStatus.ACCEPTED: return { label: 'Pilot Assigned', color: 'bg-indigo-600', icon: CheckCircle };
+      case RideStatus.ARRIVING: return { label: 'Arriving Soon', color: 'bg-emerald-500', icon: MapPin };
+      case RideStatus.IN_PROGRESS: return { label: 'In Transit', color: 'bg-blue-600', icon: Navigation };
+      case RideStatus.COMPLETED: return { label: 'Arrived at Node', color: 'bg-slate-900', icon: CheckCircle };
+      // Fix: icon: RefreshCw now works because it is imported from lucide-react
+      default: return { label: 'Processing', color: 'bg-slate-500', icon: RefreshCw };
+    }
+  };
+
+  const statusInfo = getStatusDisplay();
+
   return (
     <div className="h-full relative overflow-hidden bg-slate-100">
       <div ref={mapContainerRef} className="absolute inset-0 z-0 bg-slate-100" />
+
+      {/* REAL-TIME STATUS PILL */}
+      {rideStep === 'ON_RIDE' && (
+        <div className="absolute top-10 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-top-10 duration-700">
+           <div className={`flex items-center space-x-3 ${statusInfo.color} text-white px-6 py-3 rounded-full shadow-2xl border border-white/20 backdrop-blur-md`}>
+              <statusInfo.icon className="w-4 h-4 animate-pulse" />
+              <span className="text-[10px] font-black uppercase tracking-[0.25em]">{statusInfo.label}</span>
+              <div className="w-px h-3 bg-white/20" />
+              <span className="text-[10px] font-black">{eta} MIN</span>
+           </div>
+        </div>
+      )}
 
       {(isApiLoading || isManualMode) && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-50/50 backdrop-blur-sm pointer-events-none">
@@ -341,7 +369,7 @@ const RiderExplore: React.FC = () => {
       )}
 
       {/* SEARCH INTERFACE */}
-      <div className={`absolute top-10 left-10 w-full max-w-sm z-20 space-y-4 transition-all duration-700 ease-out ${rideStep === 'ON_RIDE' ? '-translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'}`}>
+      <div className={`absolute top-10 left-10 w-full max-w-sm z-20 space-y-4 transition-all duration-700 ease-out ${rideStep !== 'INPUT' ? '-translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'}`}>
         <div className="bg-white/95 backdrop-blur-xl p-8 rounded-[40px] shadow-2xl border border-white">
            <div className="flex items-center space-x-3 mb-8">
               <Logo className="h-10 w-auto" />
@@ -399,17 +427,19 @@ const RiderExplore: React.FC = () => {
               <div className="animate-in fade-in duration-700">
                  <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center space-x-5">
-                       <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-[24px] flex items-center justify-center font-black text-xl shadow-inner border border-blue-100 relative">
+                       <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-[24px] flex items-center justify-center font-black text-xl shadow-inner border border-blue-100 relative overflow-hidden">
                           SR
-                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
+                          <div className="absolute inset-0 bg-blue-600/5 animate-pulse"></div>
                        </div>
                        <div>
                           <p className="font-black text-slate-900 text-xl tracking-tight">Adebayo Tunde</p>
-                          <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-1">Tesla Model 3 • {eta > 0 ? 'EN ROUTE' : 'ARRIVED'}</p>
+                          <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-1">
+                            Tesla Model 3 • <span className="text-blue-600">{statusInfo.label}</span>
+                          </p>
                        </div>
                     </div>
                     <div className="text-right">
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Arrival In</p>
+                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">ETA Update</p>
                        <p className="text-4xl font-black text-blue-600 tracking-tighter">{eta}<span className="text-lg ml-1 font-bold">m</span></p>
                     </div>
                  </div>
@@ -417,11 +447,19 @@ const RiderExplore: React.FC = () => {
                     <button className="flex-1 py-5 bg-slate-50 text-slate-600 font-black rounded-2xl hover:bg-slate-100 transition flex items-center justify-center space-x-2">
                        <Phone className="w-5 h-5" /> <span>Call Partner</span>
                     </button>
-                    <button onClick={() => { 
-                      setRideStep('INPUT'); 
-                      if(driverMarkerRef.current) driverMarkerRef.current.setMap(null); 
-                      directionsRendererRef.current.setDirections({routes: []});
-                    }} className="flex-1 py-5 bg-red-50 text-red-600 font-black rounded-2xl hover:bg-red-100 transition">Abort Request</button>
+                    {rideStatus !== RideStatus.COMPLETED ? (
+                      <button onClick={() => { 
+                        setRideStep('INPUT'); 
+                        if(driverMarkerRef.current) driverMarkerRef.current.setMap(null); 
+                        directionsRendererRef.current.setDirections({routes: []});
+                      }} className="flex-1 py-5 bg-red-50 text-red-600 font-black rounded-2xl hover:bg-red-100 transition">Abort Request</button>
+                    ) : (
+                      <button onClick={() => { 
+                        setRideStep('INPUT'); 
+                        if(driverMarkerRef.current) driverMarkerRef.current.setMap(null); 
+                        directionsRendererRef.current.setDirections({routes: []});
+                      }} className="flex-1 py-5 bg-slate-900 text-white font-black rounded-2xl hover:bg-slate-800 transition">Done</button>
+                    )}
                  </div>
               </div>
             ) : (
