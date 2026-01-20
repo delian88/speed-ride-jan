@@ -16,13 +16,13 @@ import Logo from '../components/Logo';
 
 declare var google: any;
 
-// Minna, Niger State Coordinates
+// Minna, Niger State Coordinates (Central point near FUT Minna/Shiroro Hotel area)
 const MINNA_COORDS = { lat: 9.6139, lng: 6.5569 };
 
 const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ onLocationUpdate }) => {
   const { currentUser } = useApp();
   const [rideStep, setRideStep] = useState<'INPUT' | 'MATCHING' | 'ON_RIDE'>('INPUT');
-  const [pickup, setPickup] = useState('Determining location...');
+  const [pickup, setPickup] = useState('Fetching current location...');
   const [dropoff, setDropoff] = useState('');
   const [distance, setDistance] = useState(0);
   const [selectedType, setSelectedType] = useState<VehicleType>(VehicleType.ECONOMY);
@@ -62,7 +62,7 @@ const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ 
   };
 
   const getRoute = (origin: any, destination: string) => {
-    if (!origin || !destination || !google.maps) return;
+    if (!origin || !destination || !google?.maps) return;
     const service = new google.maps.DirectionsService();
     service.route(
       {
@@ -72,6 +72,7 @@ const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ 
       },
       (result: any, status: any) => {
         if (status === 'OK') {
+          // Temporarily hide markers to show clean route
           if (pickupMarkerRef.current) pickupMarkerRef.current.setMap(null);
           if (dropoffMarkerRef.current) dropoffMarkerRef.current.setMap(null);
           directionsRendererRef.current.setDirections(result);
@@ -86,11 +87,12 @@ const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ 
 
   const initMap = () => {
     if (!mapContainerRef.current || typeof google === 'undefined' || !google.maps) {
-      setMapError("Google Maps API not initialized. Please check your API key in index.html.");
+      setMapError("Google Maps API is not loading. Check your internet or API key in index.html.");
       return;
     }
 
     try {
+      // Create map instance
       mapRef.current = new google.maps.Map(mapContainerRef.current, {
         center: MINNA_COORDS,
         zoom: 15,
@@ -104,12 +106,14 @@ const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ 
         ]
       });
 
+      // Initialize route renderer
       directionsRendererRef.current = new google.maps.DirectionsRenderer({
         suppressMarkers: false,
         polylineOptions: { strokeColor: "#2563eb", strokeWeight: 6, strokeOpacity: 0.8 }
       });
       directionsRendererRef.current.setMap(mapRef.current);
 
+      // Create persistent markers
       pickupMarkerRef.current = new google.maps.Marker({
         map: mapRef.current,
         position: MINNA_COORDS,
@@ -135,6 +139,7 @@ const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ 
         }
       });
 
+      // Autocomplete setup
       const autocompleteOptions = {
         componentRestrictions: { country: "NG" },
         fields: ["formatted_address", "geometry", "name"],
@@ -174,12 +179,13 @@ const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ 
       requestUserLocation();
     } catch (err) {
       console.error("Map initialization failed:", err);
-      setMapError("Failed to initialize map interface.");
+      setMapError("Interface failure. Check console for details.");
     }
   };
 
   const requestUserLocation = () => {
     if (navigator.geolocation) {
+      setPickup("Locating you...");
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           const center = { lat: pos.coords.latitude, lng: pos.coords.longitude };
@@ -195,15 +201,17 @@ const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ 
               setPickup(address);
               const city = results[0].address_components.find((c: any) => c.types.includes("locality"))?.long_name || "Minna";
               onLocationUpdate(`${city}, Nigeria`);
+            } else {
+              setPickup(`${center.lat.toFixed(4)}, ${center.lng.toFixed(4)}`);
             }
           });
         },
         (error) => {
-          console.warn("Geolocation failed:", error);
-          setPickup("Minna, Niger State");
+          console.warn("Geolocation permission or error:", error);
+          setPickup("Minna, Niger State (GPS Disabled)");
           onLocationUpdate("Minna, Nigeria");
         },
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
       );
     } else {
       setPickup("Minna, Niger State");
@@ -211,24 +219,23 @@ const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ 
   };
 
   useEffect(() => {
+    // Polling for Google Maps availability
+    let attempts = 0;
     const checkGoogle = setInterval(() => {
+      attempts++;
       if (typeof google !== 'undefined' && google.maps) {
         initMap();
         clearInterval(checkGoogle);
       }
+      if (attempts > 20) { // 10 seconds timeout
+        clearInterval(checkGoogle);
+        if (!mapLoaded) {
+          setMapError("Google Maps script failed to load. Please ensure your API key is valid.");
+        }
+      }
     }, 500);
 
-    const timeout = setTimeout(() => {
-      if (typeof google === 'undefined') {
-        clearInterval(checkGoogle);
-        setMapError("Google Maps API timed out. Check your connection or API key.");
-      }
-    }, 10000);
-
-    return () => {
-      clearInterval(checkGoogle);
-      clearTimeout(timeout);
-    };
+    return () => clearInterval(checkGoogle);
   }, []);
 
   const calculateFare = (type: VehicleType) => {
@@ -236,6 +243,7 @@ const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ 
       [VehicleType.ECONOMY]: 1.0, [VehicleType.PREMIUM]: 1.5, [VehicleType.XL]: 2.0, [VehicleType.BIKE]: 0.5
     };
     const multiplier = multipliers[type] || 1.0;
+    // Strictly enforced ₦2,000/KM as per requirement
     const calculated = distance * 2000 * multiplier;
     return Math.max(calculated, 1000); 
   };
@@ -253,14 +261,14 @@ const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ 
                 <div className="w-8 h-8 rounded-full bg-blue-50 flex items-center justify-center">
                   <MapPin className="w-4 h-4 text-blue-600" />
                 </div>
-                <span className="font-black text-xs uppercase tracking-widest">Pickup Origin</span>
+                <span className="font-black text-xs uppercase tracking-widest">Pickup Location</span>
               </div>
               <div className="relative group">
                 <input 
                   ref={pickupInputRef}
                   value={pickup}
                   onChange={(e) => setPickup(e.target.value)}
-                  placeholder="Enter pickup point"
+                  placeholder="Street name in Minna..."
                   className="w-full pl-6 pr-12 py-5 bg-slate-50 border border-slate-100 rounded-[24px] font-bold text-sm focus:ring-4 focus:ring-blue-600/5 outline-none transition-all"
                 />
                 <button 
@@ -277,14 +285,14 @@ const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ 
                 <div className="w-8 h-8 rounded-full bg-red-50 flex items-center justify-center">
                   <MapPin className="w-4 h-4 text-red-500" />
                 </div>
-                <span className="font-black text-xs uppercase tracking-widest">Destination</span>
+                <span className="font-black text-xs uppercase tracking-widest">Where to?</span>
               </div>
               <div className="relative group">
                 <input 
                   ref={dropoffInputRef}
                   value={dropoff}
                   onChange={(e) => setDropoff(e.target.value)}
-                  placeholder="Where are you going?"
+                  placeholder="Destination in Niger State..."
                   className="w-full pl-6 pr-6 py-5 bg-slate-50 border border-slate-100 rounded-[24px] font-bold text-sm focus:ring-4 focus:ring-blue-600/5 outline-none transition-all"
                 />
               </div>
@@ -317,41 +325,23 @@ const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ 
           {/* Economics */}
           <div className="bg-slate-50 rounded-[32px] p-8 space-y-4">
             <div className="flex justify-between items-center text-xs font-black uppercase tracking-widest text-slate-400">
-              <span>Telemetry Data</span>
+              <span>Ride Telemetry</span>
               <Activity className="w-4 h-4" />
             </div>
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-slate-500 font-bold">Total Distance</span>
+                <span className="text-slate-500 font-bold">Estimated Distance</span>
                 <span className="font-black text-slate-900">{distance.toFixed(1)} KM</span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-slate-500 font-bold">Rate Multiplier</span>
-                <span className="font-black text-blue-600">x{selectedType === VehicleType.PREMIUM ? '1.5' : selectedType === VehicleType.XL ? '2.0' : '1.0'}</span>
+                <span className="text-slate-500 font-bold">Regional Rate</span>
+                <span className="font-black text-blue-600">₦2,000 / KM</span>
               </div>
               <div className="pt-4 border-t border-slate-200 flex justify-between items-end">
-                <span className="text-slate-900 font-black text-sm uppercase tracking-widest">Final Price</span>
+                <span className="text-slate-900 font-black text-sm uppercase tracking-widest">Net Fare</span>
                 <span className="text-3xl font-black text-slate-900 tracking-tighter">₦{Math.round(currentFare).toLocaleString()}</span>
               </div>
             </div>
-          </div>
-
-          {/* Payment Hub */}
-          <div className="flex gap-4">
-              <button 
-                onClick={() => setPaymentMethod('WALLET')}
-                className={`flex-1 flex flex-col items-center p-4 rounded-[24px] border-2 transition-all ${paymentMethod === 'WALLET' ? 'border-blue-600 bg-blue-50/20' : 'border-slate-50 text-slate-400'}`}
-              >
-                <Wallet className="w-5 h-5 mb-2" />
-                <span className="text-[10px] font-black uppercase">Wallet</span>
-              </button>
-              <button 
-                onClick={() => setPaymentMethod('CARD')}
-                className={`flex-1 flex flex-col items-center p-4 rounded-[24px] border-2 transition-all ${paymentMethod === 'CARD' ? 'border-blue-600 bg-blue-50/20' : 'border-slate-50 text-slate-400'}`}
-              >
-                <CreditCard className="w-5 h-5 mb-2" />
-                <span className="text-[10px] font-black uppercase">Direct Card</span>
-              </button>
           </div>
 
           <button 
@@ -359,7 +349,7 @@ const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ 
             disabled={!pickup || !dropoff || distance === 0}
             className="w-full py-6 bg-slate-900 text-white rounded-[28px] font-black text-sm uppercase tracking-[0.3em] shadow-2xl hover:bg-blue-600 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-20 disabled:cursor-not-allowed"
           >
-            {rideStep === 'MATCHING' ? 'Initializing Link...' : 'Request Ride'}
+            {rideStep === 'MATCHING' ? 'Dispatching...' : 'Request Pilot'}
           </button>
         </div>
       </div>
@@ -368,7 +358,7 @@ const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ 
       <div className="flex-1 relative bg-slate-50 overflow-hidden">
         <div ref={mapContainerRef} className={`absolute inset-0 z-0 transition-opacity duration-1000 ${mapLoaded ? 'opacity-100' : 'opacity-0'}`} />
         
-        {/* Loading/Error State Overlay */}
+        {/* State Overlays */}
         {!mapLoaded && !mapError && (
           <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-white">
              <div className="relative mb-8">
@@ -377,7 +367,7 @@ const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ 
              </div>
              <div className="flex items-center space-x-3 text-slate-400 font-black text-xs uppercase tracking-[0.4em]">
                 <Loader2 className="w-5 h-5 animate-spin" />
-                <span>Synchronizing Map Data...</span>
+                <span>Synchronizing Minna Fleet Map...</span>
              </div>
           </div>
         )}
@@ -387,13 +377,12 @@ const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ 
              <div className="p-6 bg-red-50 text-red-500 rounded-[40px] mb-6">
                 <AlertCircle className="w-16 h-16" />
              </div>
-             <h3 className="text-2xl font-black text-slate-900 mb-2">Hardware Interface Error</h3>
+             <h3 className="text-2xl font-black text-slate-900 mb-2">Map Interface offline</h3>
              <p className="text-slate-500 font-bold max-w-sm mb-8">{mapError}</p>
-             <button onClick={() => window.location.reload()} className="px-10 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-blue-600 transition">Hard Reset</button>
+             <button onClick={() => window.location.reload()} className="px-10 py-4 bg-slate-900 text-white rounded-2xl font-black uppercase tracking-widest hover:bg-blue-600 transition">Attempt Hard Reset</button>
           </div>
         )}
 
-        {/* Map UI Elements */}
         {mapLoaded && (
           <>
             <div className="absolute bottom-10 right-10 flex flex-col space-y-3 z-20">
@@ -404,13 +393,6 @@ const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ 
               <button onClick={() => updateMapBounds()} className="p-5 bg-white rounded-[24px] shadow-2xl border border-slate-100 hover:bg-blue-50 transition text-slate-400 hover:text-blue-600">
                 <RefreshCw className="w-6 h-6" />
               </button>
-            </div>
-            
-            <div className="absolute top-10 left-10 z-20">
-               <div className="bg-white/80 backdrop-blur-md px-6 py-4 rounded-3xl border border-white shadow-xl flex items-center space-x-4">
-                  <div className="w-3 h-3 rounded-full bg-green-500 animate-pulse"></div>
-                  <span className="text-[10px] font-black text-slate-900 uppercase tracking-widest">Minna Fleet Online</span>
-               </div>
             </div>
           </>
         )}
@@ -427,15 +409,9 @@ const RiderExplore: React.FC<{ onLocationUpdate: (city: string) => void }> = ({ 
                </div>
                <div>
                  <p className="text-3xl font-black text-slate-900 tracking-tight">Syncing Nearest Pilot</p>
-                 <p className="text-xs text-slate-400 font-black uppercase tracking-[0.4em] mt-2">Regional Dispatch v6.0</p>
+                 <p className="text-xs text-slate-400 font-black uppercase tracking-[0.4em] mt-2">Minna Dispatch Hub v8.0</p>
                </div>
-               <div className="w-full space-y-2">
-                 <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-600 animate-loading-bar"></div>
-                 </div>
-                 <p className="text-[10px] text-slate-300 font-black uppercase tracking-widest">Scanning local nodes...</p>
-               </div>
-               <button onClick={() => setRideStep('INPUT')} className="text-red-500 font-black text-[10px] uppercase tracking-[0.3em] hover:text-red-600 mt-4 px-6 py-2 rounded-full hover:bg-red-50 transition">Abort Transmission</button>
+               <button onClick={() => setRideStep('INPUT')} className="text-red-500 font-black text-[10px] uppercase tracking-[0.3em] hover:text-red-600 mt-4 px-6 py-2 rounded-full hover:bg-red-50 transition">Cancel Link</button>
             </div>
           </div>
         )}
@@ -472,7 +448,6 @@ const RiderDashboard: React.FC = () => {
         <div className="flex items-center space-x-6">
           <div className="flex items-center space-x-4 pl-6 border-l border-white/5">
              <div className="text-right hidden sm:block">
-                <p className="text-[9px] font-black text-white/40 uppercase tracking-[0.2em] mb-1">Wallet Credit</p>
                 <p className="text-sm font-black text-blue-400">₦{currentUser.balance.toLocaleString()}</p>
              </div>
              <div className="relative group">
@@ -496,7 +471,7 @@ const RiderDashboard: React.FC = () => {
       <div className="flex-1 relative overflow-hidden">
         <Routes>
           <Route index element={<RiderExplore onLocationUpdate={setCurrentCity} />} />
-          <Route path="history" element={<div className="p-20 text-center flex flex-col items-center justify-center space-y-6"><div className="p-10 bg-slate-50 rounded-full"><Clock className="w-16 h-16 text-slate-200" /></div><p className="text-2xl font-black text-slate-900">Historical logs are being indexed.</p></div>} />
+          <Route path="history" element={<div className="p-20 text-center flex flex-col items-center justify-center space-y-6"><div className="p-10 bg-slate-50 rounded-full"><Clock className="w-16 h-16 text-slate-200" /></div><p className="text-2xl font-black text-slate-900">Journey history unavailable.</p></div>} />
           <Route path="wallet" element={<div className="p-20 text-center flex flex-col items-center justify-center space-y-6"><div className="p-10 bg-slate-50 rounded-full"><Wallet className="w-16 h-16 text-slate-200" /></div><p className="text-2xl font-black text-slate-900">Wallet telemetry offline.</p></div>} />
           <Route path="profile" element={<div className="p-20 text-center flex flex-col items-center justify-center space-y-6"><div className="p-10 bg-slate-50 rounded-full"><UserIcon className="w-16 h-16 text-slate-200" /></div><p className="text-2xl font-black text-slate-900">Identity node sync pending.</p></div>} />
         </Routes>
