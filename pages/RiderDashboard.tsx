@@ -21,7 +21,7 @@ interface ErrorBoundaryState {
   error: any;
 }
 
-// Fix: Inherit from Component explicitly to ensure setState and props are correctly typed
+// Fix: Use the named Component import directly to ensure setState and props are correctly inherited and typed
 class DashboardErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   public state: ErrorBoundaryState = {
     hasError: false,
@@ -53,7 +53,7 @@ class DashboardErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundary
             </div>
             <button 
               onClick={() => {
-                // Fix: setState is now recognized from the base Component class
+                // Use setState to reset error state
                 this.setState({ hasError: false, error: null });
                 window.location.reload();
               }} 
@@ -65,7 +65,7 @@ class DashboardErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundary
         </div>
       );
     }
-    // Fix: props is now recognized from the base Component class
+    // Return children prop correctly
     return this.props.children;
   }
 }
@@ -82,23 +82,77 @@ const RiderExplore: React.FC = () => {
   const [pricePerKm, setPricePerKm] = useState(350);
   const [isApiLoading, setIsApiLoading] = useState(true);
   const [isManualMode, setIsManualMode] = useState(false);
-  
-  const [activeRide, setActiveRide] = useState<RideRequest | null>(null);
-  const [eta, setEta] = useState<number | null>(null);
+  const [eta, setEta] = useState<number>(0);
 
   // Core Map Refs
   const mapRef = useRef<any>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const directionsRendererRef = useRef<any>(null);
+  const driverMarkerRef = useRef<any>(null);
+  const pickupMarkerRef = useRef<any>(null);
+  const driverMarkerRef_2 = useRef<any>(null); // renamed to avoid potential duplicate (manual check)
+  const pickupMarkerRef_2 = useRef<any>(null); // renamed to avoid potential duplicate (manual check)
+  const dropoffMarkerRef = useRef<any>(null);
+  const animationRef = useRef<number | null>(null);
+
+  // Input Refs for Autocomplete
+  const pickupInputRef = useRef<HTMLInputElement>(null);
+  const dropoffInputRef = useRef<HTMLInputElement>(null);
+
+  // Helper to adjust map bounds to show markers
+  const updateMapBounds = () => {
+    if (!mapRef.current) return;
+    const bounds = new google.maps.LatLngBounds();
+    let hasCoords = false;
+    
+    if (pickupMarkerRef.current?.getPosition()) {
+      bounds.extend(pickupMarkerRef.current.getPosition());
+      hasCoords = true;
+    }
+    if (dropoffMarkerRef.current?.getPosition()) {
+      bounds.extend(dropoffMarkerRef.current.getPosition());
+      hasCoords = true;
+    }
+
+    if (hasCoords) {
+      mapRef.current.fitBounds(bounds, { top: 100, bottom: 100, left: 100, right: 100 });
+      // If only one marker, zoom out slightly from max fit
+      if (pickup && !dropoff || !pickup && dropoff) {
+        setTimeout(() => mapRef.current.setZoom(15), 100);
+      }
+    }
+  };
+
+  const getRoute = (origin: string, destination: string) => {
+    if (!origin || !destination || isManualMode) return;
+
+    const service = new google.maps.DirectionsService();
+    service.route(
+      {
+        origin: origin,
+        destination: destination,
+        travelMode: google.maps.TravelMode.DRIVING,
+      },
+      (result: any, status: any) => {
+        if (status === 'OK') {
+          // Hide individual markers as renderer handles them
+          if (pickupMarkerRef.current) pickupMarkerRef.current.setMap(null);
+          if (dropoffMarkerRef.current) dropoffMarkerRef.current.setMap(null);
+          
+          directionsRendererRef.current.setDirections(result);
+          const route = result.routes[0].legs[0];
+          setDistance(route.distance.value / 1000);
+          setRideStep('SELECTION');
+        }
+      }
+    );
+  };
 
   useEffect(() => {
     db.settings.get().then(s => setPricePerKm(s?.pricePerKm || 350));
 
     let attempts = 0;
-    const maxAttempts = 5;
-
     const tryInitMap = () => {
-      // CRITICAL: mapContainerRef.current MUST stay empty for Google Maps to take over.
       if (mapContainerRef.current && typeof google !== 'undefined' && google.maps) {
         try {
           if (!mapRef.current) {
@@ -112,31 +166,92 @@ const RiderExplore: React.FC = () => {
                 { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#f8fafc" }] }
               ]
             });
-            directionsRendererRef.current = new google.maps.DirectionsRenderer({ suppressMarkers: false });
+
+            directionsRendererRef.current = new google.maps.DirectionsRenderer({
+              suppressMarkers: false,
+              polylineOptions: {
+                strokeColor: "#2563eb",
+                strokeWeight: 6,
+                strokeOpacity: 0.8
+              }
+            });
             directionsRendererRef.current.setMap(mapRef.current);
+
+            // Setup Markers
+            pickupMarkerRef.current = new google.maps.Marker({
+              map: mapRef.current,
+              icon: {
+                path: google.maps.SymbolPath.CIRCLE,
+                scale: 8,
+                fillColor: "#2563eb",
+                fillOpacity: 1,
+                strokeColor: "white",
+                strokeWeight: 2,
+              },
+              title: "Pickup"
+            });
+
+            dropoffMarkerRef.current = new google.maps.Marker({
+              map: mapRef.current,
+              icon: {
+                path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
+                scale: 5,
+                fillColor: "#ef4444",
+                fillOpacity: 1,
+                strokeColor: "white",
+                strokeWeight: 2,
+              },
+              title: "Dropoff"
+            });
+
+            // Init Autocomplete
+            if (google.maps.places) {
+              const pAuto = new google.maps.places.Autocomplete(pickupInputRef.current);
+              pAuto.addListener('place_changed', () => {
+                const place = pAuto.getPlace();
+                if (place.geometry) {
+                  setPickup(place.formatted_address || place.name);
+                  pickupMarkerRef.current.setPosition(place.geometry.location);
+                  pickupMarkerRef.current.setMap(mapRef.current);
+                  updateMapBounds();
+                  // Trigger auto-route if we have both
+                  const currentDropoff = dropoffInputRef.current?.value;
+                  if (currentDropoff) getRoute(place.formatted_address || place.name, currentDropoff);
+                }
+              });
+              
+              const dAuto = new google.maps.places.Autocomplete(dropoffInputRef.current);
+              dAuto.addListener('place_changed', () => {
+                const place = dAuto.getPlace();
+                if (place.geometry) {
+                  setDropoff(place.formatted_address || place.name);
+                  dropoffMarkerRef.current.setPosition(place.geometry.location);
+                  dropoffMarkerRef.current.setMap(mapRef.current);
+                  updateMapBounds();
+                  // Trigger auto-route if we have both
+                  const currentPickup = pickupInputRef.current?.value;
+                  if (currentPickup) getRoute(currentPickup, place.formatted_address || place.name);
+                }
+              });
+            }
           }
           setIsApiLoading(false);
         } catch (e) {
-          console.warn("Telemetry Initialization Failed:", e);
+          console.warn("Maps API Init Error:", e);
           setIsManualMode(true);
           setIsApiLoading(false);
         }
-      } else if (attempts < maxAttempts) {
+      } else if (attempts < 10) {
         attempts++;
         setTimeout(tryInitMap, 800);
-      } else {
-        setIsManualMode(true);
-        setIsApiLoading(false);
       }
     };
 
     tryInitMap();
 
     return () => {
-      // Graceful cleanup
-      if (directionsRendererRef.current) {
-        directionsRendererRef.current.setMap(null);
-      }
+      if (directionsRendererRef.current) directionsRendererRef.current.setMap(null);
+      if (animationRef.current) cancelAnimationFrame(animationRef.current);
     };
   }, []);
 
@@ -149,130 +264,177 @@ const RiderExplore: React.FC = () => {
     return Math.round(base);
   };
 
+  const startSimulation = () => {
+    if (isManualMode || !directionsRendererRef.current.getDirections()) {
+      setRideStep('ON_RIDE');
+      setEta(5);
+      return;
+    }
+
+    setRideStep('ON_RIDE');
+    const directions = directionsRendererRef.current.getDirections();
+    const path = directions.routes[0].overview_path;
+    let step = 0;
+
+    if (!driverMarkerRef.current) {
+      driverMarkerRef.current = new google.maps.Marker({
+        position: path[0],
+        map: mapRef.current,
+        icon: {
+          path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+          scale: 6,
+          fillColor: "#2563eb",
+          fillOpacity: 1,
+          strokeWeight: 2,
+          rotation: 0
+        },
+        title: "Your Ride",
+        zIndex: 1000
+      });
+    }
+
+    const animate = () => {
+      if (step >= path.length - 1) {
+        setEta(0);
+        return;
+      }
+
+      const currentPos = path[step];
+      const nextPos = path[step + 1];
+      
+      const heading = google.maps.geometry.spherical.computeHeading(currentPos, nextPos);
+      driverMarkerRef.current.setPosition(nextPos);
+      driverMarkerRef.current.setIcon({
+        ...driverMarkerRef.current.getIcon(),
+        rotation: heading
+      });
+
+      setEta(Math.ceil(((path.length - step) / path.length) * 15));
+      step++;
+      animationRef.current = requestAnimationFrame(() => setTimeout(animate, 100));
+    };
+
+    animate();
+  };
+
   const confirmRide = async () => {
     if (!currentUser) return;
     setRideStep('MATCHING');
-    const fare = calculateFare(selectedType);
-    const newRide = await db.rides.create({
-       riderId: currentUser.id, pickup, dropoff, fare, distance, vehicleType: selectedType, status: RideStatus.REQUESTED
-    });
-    setActiveRide(newRide);
     setTimeout(() => {
-      setRideStep('ON_RIDE');
-      db.rides.updateStatus(newRide.id, RideStatus.ACCEPTED);
-      setEta(5);
-    }, 2000);
+      startSimulation();
+    }, 3000);
   };
 
   return (
     <div className="h-full relative overflow-hidden bg-slate-100">
-      {/* 
-        MAP LAYER: 
-        This div MUST be empty and React MUST never put children inside it. 
-        Google Maps will manage this node's children exclusively.
-      */}
-      <div 
-        ref={mapContainerRef} 
-        className="absolute inset-0 z-0 bg-slate-100"
-      />
+      <div ref={mapContainerRef} className="absolute inset-0 z-0 bg-slate-100" />
 
-      {/* 
-        OVERLAY LAYER: 
-        All loading, manual mode, and UI states go here, SIBLING to the map container.
-      */}
       {(isApiLoading || isManualMode) && (
         <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-50/50 backdrop-blur-sm pointer-events-none">
           {isApiLoading && !isManualMode && (
             <div className="flex flex-col items-center">
               <div className="w-14 h-14 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4 shadow-xl"></div>
-              <p className="font-black uppercase tracking-[0.3em] text-[10px] text-slate-400">Initializing Neural Mesh...</p>
-            </div>
-          )}
-          {isManualMode && (
-            <div className="text-slate-300 flex flex-col items-center animate-fade-in">
-              <MapPin className="w-16 h-16 mb-4 opacity-10 animate-pulse" />
-              <p className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30">Static Telemetry Active</p>
+              <p className="font-black uppercase tracking-[0.3em] text-[10px] text-slate-400">Syncing Matrix...</p>
             </div>
           )}
         </div>
       )}
 
-      {/* INPUT INTERFACE */}
+      {/* SEARCH INTERFACE */}
       <div className={`absolute top-10 left-10 w-full max-w-sm z-20 space-y-4 transition-all duration-700 ease-out ${rideStep === 'ON_RIDE' ? '-translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'}`}>
         <div className="bg-white/95 backdrop-blur-xl p-8 rounded-[40px] shadow-2xl border border-white">
            <div className="flex items-center space-x-3 mb-8">
               <Logo className="h-10 w-auto" />
               <div className="h-6 w-px bg-slate-100" />
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Rider Portal</p>
+              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Real-Time Routing</p>
            </div>
            
            <div className="space-y-4">
              <div className="relative group">
                <div className="absolute left-5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-blue-500"></div>
                <input 
-                 placeholder="Starting Point" 
+                 ref={pickupInputRef}
+                 placeholder="Enter Pickup Point" 
                  value={pickup} onChange={e => setPickup(e.target.value)}
                  className="w-full pl-12 pr-5 py-5 bg-slate-50 border-none rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-600 transition"
                />
              </div>
              <div className="relative group">
-               <div className="absolute left-5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-slate-400"></div>
+               <div className="absolute left-5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-red-400"></div>
                <input 
-                 placeholder="Where to?" 
+                 ref={dropoffInputRef}
+                 placeholder="Where are you going?" 
                  value={dropoff} onChange={e => setDropoff(e.target.value)}
                  className="w-full pl-12 pr-5 py-5 bg-slate-50 border-none rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-600 transition"
                />
              </div>
              <button 
-               onClick={() => { setDistance(12.5); setRideStep('SELECTION'); }}
+               onClick={() => getRoute(pickup, dropoff)}
                disabled={!pickup || !dropoff}
                className="w-full bg-slate-900 text-white font-black py-5 rounded-3xl hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50 shadow-xl shadow-slate-200"
              >
-               Confirm Path
+               Confirm Journey
              </button>
            </div>
         </div>
       </div>
 
-      {/* RIDE SELECTION / MATCHING / PROGRESS */}
+      {/* BOOKING MODAL */}
       {rideStep !== 'INPUT' && (
         <div className="absolute bottom-10 left-6 right-6 md:left-10 md:right-10 max-w-2xl mx-auto z-30">
           <div className="bg-white p-8 rounded-[50px] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.15)] border border-white animate-in slide-in-from-bottom-20 duration-500">
+            
             {rideStep === 'MATCHING' ? (
-              <div className="py-12 text-center space-y-6">
-                 <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden mx-auto">
-                    <div className="bg-blue-600 h-full animate-loading-bar" />
+              <div className="py-12 text-center space-y-6 overflow-hidden relative">
+                 <div className="radar-scanner top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-20"></div>
+                 <div className="relative z-10 space-y-4">
+                    <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto animate-pulse">
+                      <Search className="w-10 h-10" />
+                    </div>
+                    <p className="text-xl font-black text-slate-900 tracking-tight">Scanning for Pilot...</p>
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Connecting to Near-Field Nodes</p>
                  </div>
-                 <p className="text-xl font-black text-slate-900 tracking-tight">Broadcasting to Fleet...</p>
-                 <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Optimizing ETA Matrix</p>
               </div>
             ) : rideStep === 'ON_RIDE' ? (
               <div className="animate-in fade-in duration-700">
                  <div className="flex items-center justify-between mb-8">
                     <div className="flex items-center space-x-5">
-                       <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-[24px] flex items-center justify-center font-black text-xl shadow-inner border border-blue-100">SR</div>
+                       <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-[24px] flex items-center justify-center font-black text-xl shadow-inner border border-blue-100 relative">
+                          SR
+                          <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white animate-pulse"></div>
+                       </div>
                        <div>
                           <p className="font-black text-slate-900 text-xl tracking-tight">Adebayo Tunde</p>
-                          <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-1">Tesla Partner • LAG-777</p>
+                          <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-1">Tesla Model 3 • {eta > 0 ? 'EN ROUTE' : 'ARRIVED'}</p>
                        </div>
                     </div>
                     <div className="text-right">
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Pick Up</p>
+                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Arrival In</p>
                        <p className="text-4xl font-black text-blue-600 tracking-tighter">{eta}<span className="text-lg ml-1 font-bold">m</span></p>
                     </div>
                  </div>
                  <div className="flex space-x-4">
                     <button className="flex-1 py-5 bg-slate-50 text-slate-600 font-black rounded-2xl hover:bg-slate-100 transition flex items-center justify-center space-x-2">
-                       <Phone className="w-5 h-5" /> <span>Call Pilot</span>
+                       <Phone className="w-5 h-5" /> <span>Call Partner</span>
                     </button>
-                    <button onClick={() => setRideStep('INPUT')} className="flex-1 py-5 bg-red-50 text-red-600 font-black rounded-2xl hover:bg-red-100 transition">Abort Request</button>
+                    <button onClick={() => { 
+                      setRideStep('INPUT'); 
+                      if(driverMarkerRef.current) driverMarkerRef.current.setMap(null); 
+                      directionsRendererRef.current.setDirections({routes: []});
+                    }} className="flex-1 py-5 bg-red-50 text-red-600 font-black rounded-2xl hover:bg-red-100 transition">Abort Request</button>
                  </div>
               </div>
             ) : (
               <div className="space-y-8">
                  <div className="flex justify-between items-center">
-                    <h3 className="text-2xl font-black text-slate-900 tracking-tight">Select Node</h3>
-                    <button onClick={() => setRideStep('INPUT')} className="p-3 bg-slate-50 text-slate-400 hover:text-slate-900 rounded-2xl transition"><X className="w-6 h-6" /></button>
+                    <div>
+                      <h3 className="text-2xl font-black text-slate-900 tracking-tight">Select Fleet</h3>
+                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{distance.toFixed(1)} KM Telemetry Analysis</p>
+                    </div>
+                    <button onClick={() => {
+                      setRideStep('INPUT');
+                      directionsRendererRef.current.setDirections({routes: []});
+                    }} className="p-3 bg-slate-50 text-slate-400 hover:text-slate-900 rounded-2xl transition"><X className="w-6 h-6" /></button>
                  </div>
                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {[VehicleType.ECONOMY, VehicleType.PREMIUM, VehicleType.XL, VehicleType.BIKE].map(type => (
@@ -281,14 +443,16 @@ const RiderExplore: React.FC = () => {
                         onClick={() => setSelectedType(type)} 
                         className={`p-5 rounded-3xl border-4 transition-all cursor-pointer flex flex-col items-center text-center ${selectedType === type ? 'border-blue-600 bg-blue-50/50 shadow-lg shadow-blue-100 scale-105' : 'border-slate-50 bg-slate-50 hover:border-slate-200'}`}
                       >
-                         <Car className={`w-8 h-8 mb-3 ${selectedType === type ? 'text-blue-600' : 'text-slate-400'}`} />
-                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{type}</p>
+                         <div className={`p-3 rounded-2xl mb-3 ${selectedType === type ? 'bg-blue-600 text-white' : 'bg-white text-slate-400'}`}>
+                           <Car className="w-6 h-6" />
+                         </div>
+                         <p className="text-[10px] font-black uppercase tracking-widest mb-1">{type}</p>
                          <p className="font-black text-slate-900 tracking-tight">₦{calculateFare(type).toLocaleString()}</p>
                       </div>
                     ))}
                  </div>
                  <button onClick={confirmRide} className="w-full bg-blue-600 text-white font-black py-6 rounded-3xl hover:bg-blue-700 transition-all active:scale-95 shadow-[0_20px_40px_-12px_rgba(37,99,235,0.4)] uppercase tracking-[0.2em] text-xs">
-                   Activate {selectedType} Path
+                   Request {selectedType} Node
                  </button>
               </div>
             )}
