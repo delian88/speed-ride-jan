@@ -24,6 +24,7 @@ const RiderExplore: React.FC = () => {
   const [selectedType, setSelectedType] = useState<VehicleType>(VehicleType.ECONOMY);
   const [pricePerKm, setPricePerKm] = useState(350);
   const [isApiLoading, setIsApiLoading] = useState(true);
+  const [apiLoadError, setApiLoadError] = useState(false);
   
   // Real-time tracking states
   const [activeRide, setActiveRide] = useState<RideRequest | null>(null);
@@ -40,9 +41,11 @@ const RiderExplore: React.FC = () => {
     // Load Price Settings from our "Backend"
     db.settings.get().then(s => setPricePerKm(s.pricePerKm));
 
-    // Initialize Map with a check for the global google object
+    let attempts = 0;
+    const maxAttempts = 10;
+
     const initMap = () => {
-      if (typeof google !== 'undefined' && mapRef.current && !map) {
+      if (typeof google !== 'undefined' && google.maps && mapRef.current && !map) {
         try {
           const gMap = new google.maps.Map(mapRef.current, {
             center: { lat: 6.5244, lng: 3.3792 }, // Default to Lagos
@@ -72,11 +75,18 @@ const RiderExplore: React.FC = () => {
           setIsApiLoading(false);
         } catch (error) {
           console.error("Error initializing Google Maps:", error);
+          setApiLoadError(true);
           setIsApiLoading(false);
         }
-      } else if (typeof google === 'undefined') {
-        // Retry shortly if the script is still loading
-        setTimeout(initMap, 1000);
+      } else if (typeof google === 'undefined' || !google.maps) {
+        attempts++;
+        if (attempts < maxAttempts) {
+          setTimeout(initMap, 1000);
+        } else {
+          console.warn("Google Maps API failed to load after 10 seconds.");
+          setApiLoadError(true);
+          setIsApiLoading(false);
+        }
       } else {
         setIsApiLoading(false);
       }
@@ -86,18 +96,20 @@ const RiderExplore: React.FC = () => {
   }, [mapRef.current]);
 
   const calculateRoute = () => {
+    console.log("Estimating journey with:", { pickup, dropoff });
+    
     if (!pickup || !dropoff) {
       alert("Please enter both pickup and destination.");
       return;
     }
 
-    if (typeof google === 'undefined') {
-      alert("Google Maps API is not loaded. Please ensure a valid API key is in index.html.");
+    if (typeof google === 'undefined' || !google.maps) {
+      alert("Google Maps API is not loaded. Please check your internet or API key in index.html.");
       return;
     }
 
     if (!directionsRenderer) {
-      alert("Map is not ready yet. Please wait a moment.");
+      alert("Map engine is still initializing. Please wait a few seconds.");
       return;
     }
 
@@ -107,6 +119,7 @@ const RiderExplore: React.FC = () => {
       destination: dropoff,
       travelMode: google.maps.TravelMode.DRIVING
     }, (result: any, status: any) => {
+      console.log("Directions API Status:", status);
       if (status === 'OK' && result) {
         directionsRenderer.setDirections(result);
         const dist = (result.routes[0].legs[0].distance?.value || 0) / 1000;
@@ -143,7 +156,7 @@ const RiderExplore: React.FC = () => {
         setPickupMarker(pMarker);
         setDestMarker(dMarker);
       } else {
-        alert("Could not calculate route: " + status + ". Please check your addresses.");
+        alert("Route calculation failed: " + status + ". Please verify your addresses are valid locations.");
       }
     });
   };
@@ -162,7 +175,6 @@ const RiderExplore: React.FC = () => {
         setEta(step.eta);
         
         if (step.status === RideStatus.ARRIVING) {
-          // Simulate driver appearing on map
           if (map) {
             const driverLoc = { lat: map.getCenter().lat() + 0.002, lng: map.getCenter().lng() + 0.002 };
             const dMarker = new google.maps.Marker({
@@ -224,16 +236,26 @@ const RiderExplore: React.FC = () => {
       {/* Map Background */}
       <div ref={mapRef} className="absolute inset-0 z-0 bg-slate-100 flex items-center justify-center">
         {isApiLoading && (
-          <div className="text-center z-10 p-8 bg-white/80 backdrop-blur rounded-[40px] shadow-2xl border border-white">
+          <div className="text-center z-10 p-8 bg-white/80 backdrop-blur rounded-[40px] shadow-2xl border border-white max-w-xs">
             <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden relative mx-auto mb-4">
                <div className="absolute inset-0 bg-blue-600 animate-loading-bar"></div>
             </div>
             <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Initializing Neural Map...</p>
           </div>
         )}
+        {apiLoadError && !isApiLoading && (
+          <div className="text-center z-10 p-10 bg-white rounded-[40px] shadow-2xl border border-red-50 max-w-sm">
+             <div className="w-16 h-16 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <X className="w-8 h-8" />
+             </div>
+             <h3 className="text-xl font-black text-slate-900 mb-2">Map Engine Error</h3>
+             <p className="text-slate-500 font-bold mb-6 text-sm">We couldn't load the interactive map. Please check your API key or network connection.</p>
+             <button onClick={() => window.location.reload()} className="w-full bg-slate-900 text-white py-4 rounded-2xl font-black">Retry Connection</button>
+          </div>
+        )}
       </div>
 
-      {/* Prominent Live Status Bar - Only when ride is active */}
+      {/* Prominent Live Status Bar */}
       {activeRide && rideStep === 'ON_RIDE' && (
         <div className="absolute top-8 left-1/2 -translate-x-1/2 z-30 w-full max-w-md px-6 animate-slide-top">
           <div className="bg-slate-900 text-white p-4 rounded-[28px] shadow-2xl flex items-center justify-between border border-white/10 backdrop-blur-xl bg-opacity-95">
@@ -302,7 +324,7 @@ const RiderExplore: React.FC = () => {
         </div>
       </div>
 
-      {/* Ride Selection & Active Trip Info Panel */}
+      {/* Ride Selection Panel */}
       <div className={`absolute bottom-10 left-10 right-10 max-w-2xl mx-auto z-20 transition-all duration-700 transform ${rideStep !== 'INPUT' ? 'translate-y-0 opacity-100' : 'translate-y-96 opacity-0 pointer-events-none'}`}>
         <div className="bg-white p-10 rounded-[50px] shadow-[0_60px_120px_-30px_rgba(0,0,0,0.3)] border border-white">
           {rideStep === 'MATCHING' ? (

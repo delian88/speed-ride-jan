@@ -35,13 +35,19 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const savedUser = localStorage.getItem('speedride_session');
-    if (savedUser) {
-      const user = JSON.parse(savedUser);
-      setCurrentUser(user);
-      setIsAuthenticated(true);
+    if (savedUser && savedUser !== 'undefined') {
+      try {
+        const user = JSON.parse(savedUser);
+        setCurrentUser(user);
+        setIsAuthenticated(true);
+      } catch (err) {
+        console.error("Failed to parse session:", err);
+        localStorage.removeItem('speedride_session');
+      }
     }
     // Simulate a bit of loading for branding impact
-    setTimeout(() => setIsInitializing(false), 2000);
+    const timer = setTimeout(() => setIsInitializing(false), 2000);
+    return () => clearTimeout(timer);
   }, []);
 
   const login = (user: User | Driver) => {
