@@ -1,102 +1,40 @@
 
 import React, { useState, useEffect, useRef, ReactNode, Component } from 'react';
-import { Routes, Route, NavLink } from 'react-router-dom';
+import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import { 
   MapPin, Navigation, History, Wallet, LogOut,
   Car, Zap, Phone, User as UserIcon, CheckCircle, ChevronRight,
-  Camera, Save, CreditCard, Plus, ShieldCheck, Mail, Star, X,
-  Search, Locate, Users, Clock, Shield, MoreHorizontal, AlertTriangle, AlertCircle,
-  // Fix: Added missing RefreshCw icon import
-  RefreshCw
+  Plus, ShieldCheck, Mail, Star, X,
+  Search, Locate, Users, Clock, Shield, MoreHorizontal, 
+  AlertTriangle, AlertCircle, Bell, ChevronDown, CreditCard,
+  RefreshCw, Minus
 } from 'lucide-react';
 import { useApp } from '../App';
 import { RideStatus, VehicleType, User as UserType, RideRequest } from '../types';
 import { db } from '../database';
 import Logo from '../components/Logo';
 
-interface ErrorBoundaryProps {
-  children?: ReactNode;
-}
-
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error: any;
-}
-
-// Fix: Explicitly using React.Component to ensure inheritance of setState and props is recognized by TypeScript
-class DashboardErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  public state: ErrorBoundaryState = {
-    hasError: false,
-    error: null
-  };
-
-  static getDerivedStateFromError(error: any) {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: any, errorInfo: any) {
-    console.error("Dashboard Collision Detected:", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="flex flex-col items-center justify-center h-full p-10 text-center bg-slate-50">
-          <div className="p-10 bg-white rounded-[40px] shadow-2xl border border-slate-100 max-w-md w-full animate-in fade-in zoom-in duration-500">
-            <div className="w-20 h-20 bg-red-50 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-8 shadow-inner">
-              <AlertTriangle className="w-12 h-12" />
-            </div>
-            <h1 className="text-3xl font-black text-slate-900 mb-3 tracking-tighter">Interface Collision</h1>
-            <p className="text-slate-500 font-bold mb-8 text-sm leading-relaxed">
-              The neural map encountered a DOM conflict. We've isolated the graphics engine to prevent further synchronization issues.
-            </p>
-            <div className="bg-slate-900 text-blue-400 p-5 rounded-2xl text-[11px] font-mono text-left mb-8 overflow-x-auto border border-blue-500/20">
-               {this.state.error?.message || "Internal Node Error"}
-            </div>
-            <button 
-              onClick={() => {
-                // Fix: setState is now correctly inherited from React.Component
-                this.setState({ hasError: false, error: null });
-                window.location.reload();
-              }} 
-              className="w-full bg-blue-600 text-white font-black py-5 rounded-2xl hover:bg-blue-700 transition-all active:scale-95 shadow-xl shadow-blue-200"
-            >
-              Reboot Graphics Engine
-            </button>
-          </div>
-        </div>
-      );
-    }
-    // Fix: props is now correctly inherited from React.Component
-    return this.props.children;
-  }
-}
-
 declare var google: any;
 
 const RiderExplore: React.FC = () => {
   const { currentUser } = useApp();
-  const [rideStep, setRideStep] = useState<'INPUT' | 'SELECTION' | 'MATCHING' | 'ON_RIDE'>('INPUT');
+  const [rideStep, setRideStep] = useState<'INPUT' | 'MATCHING' | 'ON_RIDE'>('INPUT');
   const [rideStatus, setRideStatus] = useState<RideStatus>(RideStatus.REQUESTED);
-  const [pickup, setPickup] = useState('');
+  const [pickup, setPickup] = useState('123 Main St, New York, NY');
   const [dropoff, setDropoff] = useState('');
   const [distance, setDistance] = useState(0);
   const [selectedType, setSelectedType] = useState<VehicleType>(VehicleType.ECONOMY);
   const [pricePerKm, setPricePerKm] = useState(350);
-  const [isApiLoading, setIsApiLoading] = useState(true);
-  const [isManualMode, setIsManualMode] = useState(false);
   const [eta, setEta] = useState<number>(0);
+  const [paymentMethod, setPaymentMethod] = useState<'WALLET' | 'CARD'>('WALLET');
 
-  // Core Map Refs
+  // Map Refs
   const mapRef = useRef<any>(null);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const directionsRendererRef = useRef<any>(null);
   const driverMarkerRef = useRef<any>(null);
   const pickupMarkerRef = useRef<any>(null);
   const dropoffMarkerRef = useRef<any>(null);
-  const animationRef = useRef<number | null>(null);
-
-  // Input Refs for Autocomplete
   const pickupInputRef = useRef<HTMLInputElement>(null);
   const dropoffInputRef = useRef<HTMLInputElement>(null);
 
@@ -105,26 +43,25 @@ const RiderExplore: React.FC = () => {
     const bounds = new google.maps.LatLngBounds();
     let hasCoords = false;
     
-    if (pickupMarkerRef.current?.getPosition()) {
+    if (pickupMarkerRef.current?.getPosition() && pickup) {
       bounds.extend(pickupMarkerRef.current.getPosition());
       hasCoords = true;
     }
-    if (dropoffMarkerRef.current?.getPosition()) {
+    if (dropoffMarkerRef.current?.getPosition() && dropoff) {
       bounds.extend(dropoffMarkerRef.current.getPosition());
       hasCoords = true;
     }
 
     if (hasCoords) {
-      mapRef.current.fitBounds(bounds, { top: 120, bottom: 350, left: 100, right: 100 });
-      if ((pickup && !dropoff) || (!pickup && dropoff)) {
+      mapRef.current.fitBounds(bounds, { top: 100, bottom: 100, left: 100, right: 100 });
+      if (!dropoff || !pickup) {
         setTimeout(() => mapRef.current.setZoom(15), 100);
       }
     }
   };
 
   const getRoute = (origin: string, destination: string) => {
-    if (!origin || !destination || isManualMode) return;
-
+    if (!origin || !destination) return;
     const service = new google.maps.DirectionsService();
     service.route(
       {
@@ -136,11 +73,9 @@ const RiderExplore: React.FC = () => {
         if (status === 'OK') {
           if (pickupMarkerRef.current) pickupMarkerRef.current.setMap(null);
           if (dropoffMarkerRef.current) dropoffMarkerRef.current.setMap(null);
-          
           directionsRendererRef.current.setDirections(result);
           const route = result.routes[0].legs[0];
           setDistance(route.distance.value / 1000);
-          setRideStep('SELECTION');
         }
       }
     );
@@ -149,394 +84,365 @@ const RiderExplore: React.FC = () => {
   useEffect(() => {
     db.settings.get().then(s => setPricePerKm(s?.pricePerKm || 350));
 
-    let attempts = 0;
-    const tryInitMap = () => {
+    const initMap = () => {
       if (mapContainerRef.current && typeof google !== 'undefined' && google.maps) {
-        try {
-          if (!mapRef.current) {
-            mapRef.current = new google.maps.Map(mapContainerRef.current, {
-              center: { lat: 6.5244, lng: 3.3792 },
-              zoom: 14,
-              disableDefaultUI: true,
-              styles: [
-                { featureType: "all", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
-                { featureType: "water", elementType: "geometry", stylers: [{ color: "#e2e8f0" }] },
-                { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#f8fafc" }] }
-              ]
-            });
+        mapRef.current = new google.maps.Map(mapContainerRef.current, {
+          center: { lat: 40.7128, lng: -74.0060 }, // NYC
+          zoom: 13,
+          disableDefaultUI: true,
+          styles: [
+            { featureType: "all", elementType: "labels.text.fill", stylers: [{ color: "#64748b" }] },
+            { featureType: "water", elementType: "geometry", stylers: [{ color: "#cbd5e1" }] },
+            { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#f1f5f9" }] }
+          ]
+        });
 
-            directionsRendererRef.current = new google.maps.DirectionsRenderer({
-              suppressMarkers: false,
-              polylineOptions: {
-                strokeColor: "#2563eb",
-                strokeWeight: 6,
-                strokeOpacity: 0.8
-              }
-            });
-            directionsRendererRef.current.setMap(mapRef.current);
+        directionsRendererRef.current = new google.maps.DirectionsRenderer({
+          suppressMarkers: false,
+          polylineOptions: { strokeColor: "#2563eb", strokeWeight: 6, strokeOpacity: 0.8 }
+        });
+        directionsRendererRef.current.setMap(mapRef.current);
 
-            pickupMarkerRef.current = new google.maps.Marker({
-              map: mapRef.current,
-              icon: {
-                path: google.maps.SymbolPath.CIRCLE,
-                scale: 8,
-                fillColor: "#2563eb",
-                fillOpacity: 1,
-                strokeColor: "white",
-                strokeWeight: 2,
-              }
-            });
-
-            dropoffMarkerRef.current = new google.maps.Marker({
-              map: mapRef.current,
-              icon: {
-                path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
-                scale: 5,
-                fillColor: "#ef4444",
-                fillOpacity: 1,
-                strokeColor: "white",
-                strokeWeight: 2,
-              }
-            });
-
-            if (google.maps.places) {
-              const pAuto = new google.maps.places.Autocomplete(pickupInputRef.current);
-              pAuto.addListener('place_changed', () => {
-                const place = pAuto.getPlace();
-                if (place.geometry) {
-                  setPickup(place.formatted_address || place.name);
-                  pickupMarkerRef.current.setPosition(place.geometry.location);
-                  pickupMarkerRef.current.setMap(mapRef.current);
-                  updateMapBounds();
-                  if (dropoffInputRef.current?.value) getRoute(place.formatted_address || place.name, dropoffInputRef.current.value);
-                }
-              });
-              
-              const dAuto = new google.maps.places.Autocomplete(dropoffInputRef.current);
-              dAuto.addListener('place_changed', () => {
-                const place = dAuto.getPlace();
-                if (place.geometry) {
-                  setDropoff(place.formatted_address || place.name);
-                  dropoffMarkerRef.current.setPosition(place.geometry.location);
-                  dropoffMarkerRef.current.setMap(mapRef.current);
-                  updateMapBounds();
-                  if (pickupInputRef.current?.value) getRoute(pickupInputRef.current.value, place.formatted_address || place.name);
-                }
-              });
-            }
+        pickupMarkerRef.current = new google.maps.Marker({
+          map: mapRef.current,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 10,
+            fillColor: "#2563eb",
+            fillOpacity: 1,
+            strokeColor: "white",
+            strokeWeight: 3,
           }
-          setIsApiLoading(false);
-        } catch (e) {
-          console.warn("Maps API Init Error:", e);
-          setIsManualMode(true);
-          setIsApiLoading(false);
+        });
+
+        dropoffMarkerRef.current = new google.maps.Marker({
+          map: mapRef.current,
+          icon: {
+            path: "M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z",
+            fillColor: "#ef4444",
+            fillOpacity: 1,
+            strokeWeight: 0,
+            scale: 2,
+            anchor: new google.maps.Point(12, 22)
+          }
+        });
+
+        if (google.maps.places) {
+          const pAuto = new google.maps.places.Autocomplete(pickupInputRef.current);
+          pAuto.addListener('place_changed', () => {
+            const place = pAuto.getPlace();
+            if (place.geometry) {
+              setPickup(place.formatted_address || place.name);
+              pickupMarkerRef.current.setPosition(place.geometry.location);
+              pickupMarkerRef.current.setMap(mapRef.current);
+              updateMapBounds();
+              if (dropoff) getRoute(place.formatted_address || place.name, dropoff);
+            }
+          });
+
+          const dAuto = new google.maps.places.Autocomplete(dropoffInputRef.current);
+          dAuto.addListener('place_changed', () => {
+            const place = dAuto.getPlace();
+            if (place.geometry) {
+              setDropoff(place.formatted_address || place.name);
+              dropoffMarkerRef.current.setPosition(place.geometry.location);
+              dropoffMarkerRef.current.setMap(mapRef.current);
+              updateMapBounds();
+              if (pickup) getRoute(pickup, place.formatted_address || place.name);
+            }
+          });
         }
-      } else if (attempts < 10) {
-        attempts++;
-        setTimeout(tryInitMap, 800);
       }
     };
 
-    tryInitMap();
+    const interval = setInterval(() => {
+      if (typeof google !== 'undefined') {
+        initMap();
+        clearInterval(interval);
+      }
+    }, 500);
 
-    return () => {
-      if (directionsRendererRef.current) directionsRendererRef.current.setMap(null);
-      if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    };
+    return () => clearInterval(interval);
   }, []);
 
   const calculateFare = (type: VehicleType) => {
     const multipliers: Record<string, number> = {
-      [VehicleType.ECONOMY]: 1.0, [VehicleType.PREMIUM]: 2.2, [VehicleType.XL]: 1.8, [VehicleType.BIKE]: 0.7
+      [VehicleType.ECONOMY]: 1.0, [VehicleType.PREMIUM]: 2.1, [VehicleType.XL]: 2.5, [VehicleType.BIKE]: 0.6
     };
     const multiplier = multipliers[type] || 1.0;
-    const base = Math.max(distance * pricePerKm * multiplier, 500);
-    return Math.round(base);
+    return Math.max(distance * pricePerKm * multiplier, 500);
   };
 
-  const startSimulation = () => {
-    if (isManualMode || !directionsRendererRef.current.getDirections()) {
+  const currentFare = calculateFare(selectedType);
+
+  const confirmRide = () => {
+    setRideStep('MATCHING');
+    setTimeout(() => {
       setRideStep('ON_RIDE');
       setRideStatus(RideStatus.IN_PROGRESS);
       setEta(5);
-      return;
-    }
-
-    setRideStep('ON_RIDE');
-    setRideStatus(RideStatus.ACCEPTED);
-    
-    const directions = directionsRendererRef.current.getDirections();
-    const path = directions.routes[0].overview_path;
-    let step = 0;
-
-    if (!driverMarkerRef.current) {
-      driverMarkerRef.current = new google.maps.Marker({
-        position: path[0],
-        map: mapRef.current,
-        icon: {
-          path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-          scale: 6,
-          fillColor: "#2563eb",
-          fillOpacity: 1,
-          strokeWeight: 2,
-          rotation: 0
-        },
-        title: "Your Ride",
-        zIndex: 1000
-      });
-    }
-
-    const animate = () => {
-      if (step >= path.length - 1) {
-        setEta(0);
-        setRideStatus(RideStatus.COMPLETED);
-        return;
-      }
-
-      const currentPos = path[step];
-      const nextPos = path[step + 1];
-      
-      const heading = google.maps.geometry.spherical.computeHeading(currentPos, nextPos);
-      driverMarkerRef.current.setPosition(nextPos);
-      driverMarkerRef.current.setIcon({
-        ...driverMarkerRef.current.getIcon(),
-        rotation: heading
-      });
-
-      // Status Logic
-      const progress = step / path.length;
-      if (progress < 0.15) setRideStatus(RideStatus.ACCEPTED);
-      else if (progress < 0.35) setRideStatus(RideStatus.ARRIVING);
-      else if (progress < 0.95) setRideStatus(RideStatus.IN_PROGRESS);
-      else setRideStatus(RideStatus.COMPLETED);
-
-      setEta(Math.ceil(((path.length - step) / path.length) * 15));
-      step++;
-      animationRef.current = requestAnimationFrame(() => setTimeout(animate, 150));
-    };
-
-    animate();
-  };
-
-  const confirmRide = async () => {
-    if (!currentUser) return;
-    setRideStep('MATCHING');
-    setRideStatus(RideStatus.REQUESTED);
-    setTimeout(() => {
-      startSimulation();
     }, 3000);
   };
 
-  const getStatusDisplay = () => {
-    switch(rideStatus) {
-      case RideStatus.REQUESTED: return { label: 'Syncing Request', color: 'bg-slate-900', icon: Search };
-      case RideStatus.ACCEPTED: return { label: 'Pilot Assigned', color: 'bg-indigo-600', icon: CheckCircle };
-      case RideStatus.ARRIVING: return { label: 'Arriving Soon', color: 'bg-emerald-500', icon: MapPin };
-      case RideStatus.IN_PROGRESS: return { label: 'In Transit', color: 'bg-blue-600', icon: Navigation };
-      case RideStatus.COMPLETED: return { label: 'Arrived at Node', color: 'bg-slate-900', icon: CheckCircle };
-      // Fix: icon: RefreshCw now works because it is imported from lucide-react
-      default: return { label: 'Processing', color: 'bg-slate-500', icon: RefreshCw };
-    }
-  };
-
-  const statusInfo = getStatusDisplay();
-
   return (
-    <div className="h-full relative overflow-hidden bg-slate-100">
-      <div ref={mapContainerRef} className="absolute inset-0 z-0 bg-slate-100" />
-
-      {/* REAL-TIME STATUS PILL */}
-      {rideStep === 'ON_RIDE' && (
-        <div className="absolute top-10 left-1/2 -translate-x-1/2 z-40 animate-in slide-in-from-top-10 duration-700">
-           <div className={`flex items-center space-x-3 ${statusInfo.color} text-white px-6 py-3 rounded-full shadow-2xl border border-white/20 backdrop-blur-md`}>
-              <statusInfo.icon className="w-4 h-4 animate-pulse" />
-              <span className="text-[10px] font-black uppercase tracking-[0.25em]">{statusInfo.label}</span>
-              <div className="w-px h-3 bg-white/20" />
-              <span className="text-[10px] font-black">{eta} MIN</span>
-           </div>
-        </div>
-      )}
-
-      {(isApiLoading || isManualMode) && (
-        <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-50/50 backdrop-blur-sm pointer-events-none">
-          {isApiLoading && !isManualMode && (
-            <div className="flex flex-col items-center">
-              <div className="w-14 h-14 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-4 shadow-xl"></div>
-              <p className="font-black uppercase tracking-[0.3em] text-[10px] text-slate-400">Syncing Matrix...</p>
+    <div className="flex h-full w-full bg-white">
+      {/* Sidebar Overlay */}
+      <div className="w-[420px] h-full flex flex-col border-r border-slate-100 shadow-2xl z-10 overflow-y-auto custom-scrollbar bg-white">
+        <div className="p-8 space-y-8">
+          {/* Pickup Selection */}
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <div className="flex items-center space-x-3 text-slate-900 mb-2">
+                <MapPin className="w-5 h-5 text-blue-600" />
+                <span className="font-bold text-sm tracking-tight">Your Location</span>
+              </div>
+              <div className="relative group">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-blue-600 shadow-[0_0_8px_rgba(37,99,235,0.4)]"></div>
+                <input 
+                  ref={pickupInputRef}
+                  value={pickup}
+                  onChange={(e) => setPickup(e.target.value)}
+                  placeholder="Enter pickup point"
+                  className="w-full pl-10 pr-10 py-4 bg-slate-50 border border-slate-100 rounded-xl font-medium text-sm focus:ring-2 focus:ring-blue-600/20 outline-none transition-all"
+                />
+                <button className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition">
+                  <Locate className="w-4 h-4" />
+                </button>
+              </div>
             </div>
-          )}
-        </div>
-      )}
 
-      {/* SEARCH INTERFACE */}
-      <div className={`absolute top-10 left-10 w-full max-w-sm z-20 space-y-4 transition-all duration-700 ease-out ${rideStep !== 'INPUT' ? '-translate-x-full opacity-0 pointer-events-none' : 'translate-x-0 opacity-100'}`}>
-        <div className="bg-white/95 backdrop-blur-xl p-8 rounded-[40px] shadow-2xl border border-white">
-           <div className="flex items-center space-x-3 mb-8">
-              <Logo className="h-10 w-auto" />
-              <div className="h-6 w-px bg-slate-100" />
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Real-Time Routing</p>
-           </div>
-           
-           <div className="space-y-4">
-             <div className="relative group">
-               <div className="absolute left-5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-blue-500"></div>
-               <input 
-                 ref={pickupInputRef}
-                 placeholder="Enter Pickup Point" 
-                 value={pickup} onChange={e => setPickup(e.target.value)}
-                 className="w-full pl-12 pr-5 py-5 bg-slate-50 border-none rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-600 transition"
-               />
-             </div>
-             <div className="relative group">
-               <div className="absolute left-5 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-red-400"></div>
-               <input 
-                 ref={dropoffInputRef}
-                 placeholder="Where are you going?" 
-                 value={dropoff} onChange={e => setDropoff(e.target.value)}
-                 className="w-full pl-12 pr-5 py-5 bg-slate-50 border-none rounded-2xl font-bold outline-none focus:ring-2 focus:ring-blue-600 transition"
-               />
-             </div>
-             <button 
-               onClick={() => getRoute(pickup, dropoff)}
-               disabled={!pickup || !dropoff}
-               className="w-full bg-slate-900 text-white font-black py-5 rounded-3xl hover:bg-blue-600 transition-all active:scale-95 disabled:opacity-50 shadow-xl shadow-slate-200"
-             >
-               Confirm Journey
-             </button>
-           </div>
+            <div className="space-y-2">
+              <div className="flex items-center space-x-3 text-slate-900 mb-2">
+                <MapPin className="w-5 h-5 text-red-500" />
+                <span className="font-bold text-sm tracking-tight">Drop-off Location</span>
+              </div>
+              <div className="relative group">
+                <input 
+                  ref={dropoffInputRef}
+                  value={dropoff}
+                  onChange={(e) => setDropoff(e.target.value)}
+                  placeholder="Enter destination"
+                  className="w-full pl-5 pr-10 py-4 bg-slate-50 border border-slate-100 rounded-xl font-medium text-sm focus:ring-2 focus:ring-blue-600/20 outline-none transition-all"
+                />
+                <button className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-blue-600 transition">
+                  <ChevronDown className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Vehicle Selection */}
+          <div className="grid grid-cols-3 gap-3">
+            {[
+              { type: VehicleType.ECONOMY, label: 'Economy', price: 12.50, time: 5, img: 'https://images.unsplash.com/photo-1541899481282-d53bffe3c35d?w=200&q=80' },
+              { type: VehicleType.PREMIUM, label: 'Premium', price: 25.80, time: 3, img: 'https://images.unsplash.com/photo-1555215695-3004980ad54e?w=200&q=80' },
+              { type: VehicleType.XL, label: 'SUV', price: 30.20, time: 6, img: 'https://images.unsplash.com/photo-1533473359331-0135ef1b58bf?w=200&q=80' }
+            ].map((v) => (
+              <div 
+                key={v.type}
+                onClick={() => setSelectedType(v.type)}
+                className={`cursor-pointer rounded-xl border-2 transition-all overflow-hidden ${selectedType === v.type ? 'border-blue-600 bg-blue-50/20 ring-4 ring-blue-50' : 'border-slate-100 hover:border-slate-200'}`}
+              >
+                <div className="h-16 relative overflow-hidden bg-slate-100">
+                  <img src={v.img} className="w-full h-full object-cover" />
+                  {selectedType === v.type && (
+                    <div className="absolute top-1 right-1 bg-blue-600 text-white rounded-full p-0.5">
+                      <CheckCircle className="w-3 h-3" />
+                    </div>
+                  )}
+                </div>
+                <div className={`p-3 text-center ${selectedType === v.type ? 'bg-blue-600 text-white' : 'bg-white'}`}>
+                  <p className="text-[10px] font-black uppercase tracking-widest">{v.label}</p>
+                  <p className="text-xs font-bold mt-1">₦{(currentFare * (v.price/12.5)).toLocaleString()} • {v.time} min</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Fare Details */}
+          <div className="border-t border-slate-100 pt-6 space-y-4">
+            <div className="flex justify-between items-center group cursor-pointer">
+              <span className="font-bold text-slate-500 text-sm">Fare Details</span>
+              <ChevronDown className="w-4 h-4 text-slate-300 group-hover:text-slate-900 transition" />
+            </div>
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400 font-medium">Base Fare</span>
+                <span className="font-bold text-slate-900">₦500.00</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400 font-medium">Distance & Time</span>
+                <span className="font-bold text-slate-900">₦{(currentFare * 0.8).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-400 font-medium">Service Fee</span>
+                <span className="font-bold text-slate-900">₦{(currentFare * 0.1).toLocaleString()}</span>
+              </div>
+              <div className="flex justify-between items-center pt-2">
+                <span className="text-slate-900 font-black text-sm">Estimated Total</span>
+                <span className="text-xl font-black text-slate-900">₦{currentFare.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Payment Method */}
+          <div className="border-t border-slate-100 pt-6 space-y-4">
+            <div className="flex justify-between items-center group cursor-pointer">
+              <span className="font-bold text-slate-500 text-sm">Payment Method</span>
+              <ChevronDown className="w-4 h-4 text-slate-300 group-hover:text-slate-900 transition" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button 
+                onClick={() => setPaymentMethod('WALLET')}
+                className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all ${paymentMethod === 'WALLET' ? 'border-blue-600 bg-blue-50/20' : 'border-slate-50 bg-slate-50 text-slate-400'}`}
+              >
+                <Wallet className={`w-4 h-4 ${paymentMethod === 'WALLET' ? 'text-blue-600' : ''}`} />
+                <span className="text-xs font-black">Wallet (₦{currentUser?.balance.toLocaleString()})</span>
+              </button>
+              <button 
+                onClick={() => setPaymentMethod('CARD')}
+                className={`flex items-center space-x-3 p-4 rounded-xl border-2 transition-all ${paymentMethod === 'CARD' ? 'border-blue-600 bg-blue-50/20' : 'border-slate-50 bg-slate-50 text-slate-400'}`}
+              >
+                <CreditCard className={`w-4 h-4 ${paymentMethod === 'CARD' ? 'text-blue-600' : ''}`} />
+                <span className="text-xs font-black">Card **** 1234</span>
+              </button>
+            </div>
+            <button className="text-blue-600 text-[10px] font-black uppercase tracking-widest hover:underline">Add Payment Method</button>
+          </div>
+
+          {/* Action Button */}
+          <button 
+            onClick={confirmRide}
+            disabled={!pickup || !dropoff}
+            className="w-full py-5 bg-gradient-to-r from-slate-900 to-slate-800 text-white rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-2xl shadow-slate-200 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-30 disabled:grayscale"
+          >
+            {rideStep === 'MATCHING' ? 'Synchronizing Node...' : 'Confirm Ride'}
+          </button>
         </div>
       </div>
 
-      {/* BOOKING MODAL */}
-      {rideStep !== 'INPUT' && (
-        <div className="absolute bottom-10 left-6 right-6 md:left-10 md:right-10 max-w-2xl mx-auto z-30">
-          <div className="bg-white p-8 rounded-[50px] shadow-[0_32px_64px_-12px_rgba(0,0,0,0.15)] border border-white animate-in slide-in-from-bottom-20 duration-500">
-            
-            {rideStep === 'MATCHING' ? (
-              <div className="py-12 text-center space-y-6 overflow-hidden relative">
-                 <div className="radar-scanner top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-20"></div>
-                 <div className="relative z-10 space-y-4">
-                    <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto animate-pulse">
-                      <Search className="w-10 h-10" />
-                    </div>
-                    <p className="text-xl font-black text-slate-900 tracking-tight">Scanning for Pilot...</p>
-                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em]">Connecting to Near-Field Nodes</p>
-                 </div>
-              </div>
-            ) : rideStep === 'ON_RIDE' ? (
-              <div className="animate-in fade-in duration-700">
-                 <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center space-x-5">
-                       <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-[24px] flex items-center justify-center font-black text-xl shadow-inner border border-blue-100 relative overflow-hidden">
-                          SR
-                          <div className="absolute inset-0 bg-blue-600/5 animate-pulse"></div>
-                       </div>
-                       <div>
-                          <p className="font-black text-slate-900 text-xl tracking-tight">Adebayo Tunde</p>
-                          <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.2em] mt-1">
-                            Tesla Model 3 • <span className="text-blue-600">{statusInfo.label}</span>
-                          </p>
-                       </div>
-                    </div>
-                    <div className="text-right">
-                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">ETA Update</p>
-                       <p className="text-4xl font-black text-blue-600 tracking-tighter">{eta}<span className="text-lg ml-1 font-bold">m</span></p>
-                    </div>
-                 </div>
-                 <div className="flex space-x-4">
-                    <button className="flex-1 py-5 bg-slate-50 text-slate-600 font-black rounded-2xl hover:bg-slate-100 transition flex items-center justify-center space-x-2">
-                       <Phone className="w-5 h-5" /> <span>Call Partner</span>
-                    </button>
-                    {rideStatus !== RideStatus.COMPLETED ? (
-                      <button onClick={() => { 
-                        setRideStep('INPUT'); 
-                        if(driverMarkerRef.current) driverMarkerRef.current.setMap(null); 
-                        directionsRendererRef.current.setDirections({routes: []});
-                      }} className="flex-1 py-5 bg-red-50 text-red-600 font-black rounded-2xl hover:bg-red-100 transition">Abort Request</button>
-                    ) : (
-                      <button onClick={() => { 
-                        setRideStep('INPUT'); 
-                        if(driverMarkerRef.current) driverMarkerRef.current.setMap(null); 
-                        directionsRendererRef.current.setDirections({routes: []});
-                      }} className="flex-1 py-5 bg-slate-900 text-white font-black rounded-2xl hover:bg-slate-800 transition">Done</button>
-                    )}
-                 </div>
-              </div>
-            ) : (
-              <div className="space-y-8">
-                 <div className="flex justify-between items-center">
-                    <div>
-                      <h3 className="text-2xl font-black text-slate-900 tracking-tight">Select Fleet</h3>
-                      <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">{distance.toFixed(1)} KM Telemetry Analysis</p>
-                    </div>
-                    <button onClick={() => {
-                      setRideStep('INPUT');
-                      directionsRendererRef.current.setDirections({routes: []});
-                    }} className="p-3 bg-slate-50 text-slate-400 hover:text-slate-900 rounded-2xl transition"><X className="w-6 h-6" /></button>
-                 </div>
-                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    {[VehicleType.ECONOMY, VehicleType.PREMIUM, VehicleType.XL, VehicleType.BIKE].map(type => (
-                      <div 
-                        key={type} 
-                        onClick={() => setSelectedType(type)} 
-                        className={`p-5 rounded-3xl border-4 transition-all cursor-pointer flex flex-col items-center text-center ${selectedType === type ? 'border-blue-600 bg-blue-50/50 shadow-lg shadow-blue-100 scale-105' : 'border-slate-50 bg-slate-50 hover:border-slate-200'}`}
-                      >
-                         <div className={`p-3 rounded-2xl mb-3 ${selectedType === type ? 'bg-blue-600 text-white' : 'bg-white text-slate-400'}`}>
-                           <Car className="w-6 h-6" />
-                         </div>
-                         <p className="text-[10px] font-black uppercase tracking-widest mb-1">{type}</p>
-                         <p className="font-black text-slate-900 tracking-tight">₦{calculateFare(type).toLocaleString()}</p>
-                      </div>
-                    ))}
-                 </div>
-                 <button onClick={confirmRide} className="w-full bg-blue-600 text-white font-black py-6 rounded-3xl hover:bg-blue-700 transition-all active:scale-95 shadow-[0_20px_40px_-12px_rgba(37,99,235,0.4)] uppercase tracking-[0.2em] text-xs">
-                   Request {selectedType} Node
-                 </button>
-              </div>
-            )}
+      {/* Map Content */}
+      <div className="flex-1 relative bg-slate-100">
+        <div ref={mapContainerRef} className="absolute inset-0 z-0" />
+        
+        {/* Floating Controls */}
+        <div className="absolute bottom-10 right-10 flex flex-col space-y-3 z-20">
+          <div className="flex flex-col bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden">
+            <button onClick={() => mapRef.current?.setZoom((mapRef.current?.getZoom() || 13) + 1)} className="p-4 hover:bg-slate-50 transition text-slate-400 hover:text-slate-900 border-b border-slate-50"><Plus className="w-6 h-6" /></button>
+            <button onClick={() => mapRef.current?.setZoom((mapRef.current?.getZoom() || 13) - 1)} className="p-4 hover:bg-slate-50 transition text-slate-400 hover:text-slate-900"><Minus className="w-6 h-6" /></button>
           </div>
+          <button onClick={() => updateMapBounds()} className="p-4 bg-white rounded-2xl shadow-2xl border border-slate-100 hover:bg-slate-50 transition text-slate-400 hover:text-blue-600">
+            <RefreshCw className="w-6 h-6" />
+          </button>
+          <button className="p-4 bg-blue-600 rounded-2xl shadow-2xl text-white hover:bg-blue-700 transition">
+            <Zap className="w-6 h-6" />
+          </button>
         </div>
-      )}
+
+        {/* Route Info Overlay (Matching) */}
+        {rideStep === 'MATCHING' && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center bg-slate-900/10 backdrop-blur-sm pointer-events-none">
+            <div className="bg-white p-10 rounded-[40px] shadow-2xl flex flex-col items-center space-y-6 animate-in zoom-in duration-500">
+              <div className="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center animate-pulse">
+                <Search className="w-10 h-10" />
+              </div>
+              <div className="text-center">
+                <p className="text-2xl font-black text-slate-900 tracking-tight">Finding Your Pilot</p>
+                <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">Connecting to available fleet nodes...</p>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
 
+const RiderDashboard: React.FC = () => {
+  const { logout, currentUser } = useApp();
+  const navigate = useNavigate();
+
+  if (!currentUser) return null;
+  
+  return (
+    <div className="flex flex-col h-screen bg-white">
+      {/* Top Header Bar */}
+      <header className="h-20 bg-slate-900 text-white flex items-center justify-between px-8 z-50 shrink-0 shadow-2xl">
+        <div className="flex items-center space-x-12">
+          <Logo className="h-10 w-auto brightness-0 invert" />
+          <div className="hidden md:flex items-center space-x-3 bg-white/5 px-6 py-3 rounded-xl border border-white/5 cursor-pointer hover:bg-white/10 transition">
+            <MapPin className="w-4 h-4 text-blue-500" />
+            <span className="text-xs font-black">New York, NY</span>
+            <ChevronDown className="w-3 h-3 text-white/40" />
+          </div>
+        </div>
+
+        <nav className="hidden lg:flex items-center space-x-10 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">
+           <NavLink to="/rider" end className={({isActive}) => isActive ? "text-white" : "hover:text-white transition"}>Booking Hub</NavLink>
+           <NavLink to="/rider/history" className={({isActive}) => isActive ? "text-white" : "hover:text-white transition"}>Journey Logs</NavLink>
+           <NavLink to="/rider/wallet" className={({isActive}) => isActive ? "text-white" : "hover:text-white transition"}>Transactions</NavLink>
+        </nav>
+
+        <div className="flex items-center space-x-6">
+          <button className="relative p-2 text-white/40 hover:text-white transition">
+            <Bell className="w-6 h-6" />
+            <div className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full border-2 border-slate-900"></div>
+          </button>
+          
+          <div className="flex items-center space-x-4 pl-6 border-l border-white/5">
+             <div className="text-right hidden sm:block">
+                <p className="text-[10px] font-black text-white/40 uppercase tracking-widest">Available</p>
+                <p className="text-sm font-black text-blue-400">₦{currentUser.balance.toLocaleString()}</p>
+             </div>
+             <div className="relative group">
+               <button className="flex items-center space-x-3 p-1.5 pr-4 bg-white/5 rounded-2xl border border-white/5 hover:bg-white/10 transition">
+                  <img src={currentUser.avatar} className="w-10 h-10 rounded-xl object-cover" />
+                  <ChevronDown className="w-3 h-3 text-white/40" />
+               </button>
+               <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-slate-100 overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all py-2 text-slate-900">
+                  <button onClick={() => navigate('/rider/profile')} className="w-full flex items-center space-x-3 px-5 py-3 hover:bg-slate-50 transition font-black text-xs uppercase tracking-widest"><UserIcon className="w-4 h-4" /> <span>Identity</span></button>
+                  <button onClick={logout} className="w-full flex items-center space-x-3 px-5 py-3 hover:bg-red-50 text-red-600 transition font-black text-xs uppercase tracking-widest"><LogOut className="w-4 h-4" /> <span>Terminate Session</span></button>
+               </div>
+             </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <div className="flex-1 relative overflow-hidden">
+        <Routes>
+          <Route index element={<RiderExplore />} />
+          <Route path="history" element={<RiderHistory />} />
+          <Route path="wallet" element={<RiderWallet />} />
+          <Route path="profile" element={<RiderProfile />} />
+        </Routes>
+      </div>
+    </div>
+  );
+};
+
+// Simplified sub-views for demonstration based on previous high-quality logic
 const RiderHistory: React.FC = () => {
   const { currentUser } = useApp();
   const [rides, setRides] = useState<any[]>([]);
   useEffect(() => { if (currentUser?.id) db.rides.getByUser(currentUser.id).then(setRides); }, [currentUser]);
-  
   return (
-    <div className="p-10 space-y-8 overflow-y-auto h-full pb-32">
+    <div className="p-10 max-w-5xl mx-auto space-y-8 h-full overflow-y-auto pb-32">
       <h2 className="text-4xl font-black text-slate-900 tracking-tight">Telemetry History</h2>
-      {rides.length === 0 ? (
-        <div className="py-20 text-center bg-white rounded-[40px] border border-slate-100 shadow-sm">
-           <History className="w-16 h-16 text-slate-100 mx-auto mb-4" />
-           <p className="text-slate-400 font-black uppercase tracking-widest text-[10px]">No historical data found</p>
-        </div>
-      ) : (
-        <div className="grid gap-4">
-          {rides.map(r => (
-            <div key={r.id} className="bg-white p-8 rounded-[32px] border border-slate-100 flex items-center justify-between group hover:shadow-xl transition-all duration-500">
-              <div className="flex items-center space-x-6">
-                 <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 group-hover:bg-blue-50 group-hover:text-blue-500 transition">
-                    <Navigation className="w-6 h-6" />
-                 </div>
-                 <div>
-                    <p className="font-black text-slate-900 text-lg">{(r.dropoff || 'Journey').split(',')[0]}</p>
-                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">
-                       {new Date(r.createdAt).toLocaleDateString()} • {r.status}
-                    </p>
-                 </div>
-              </div>
-              <div className="text-right">
-                 <p className="text-2xl font-black text-slate-900 tracking-tighter">₦{(r.fare || 0).toLocaleString()}</p>
-                 <p className="text-[10px] text-emerald-500 font-black uppercase tracking-widest">Settled</p>
-              </div>
+      <div className="grid gap-4">
+        {rides.map(r => (
+          <div key={r.id} className="bg-white p-8 rounded-[32px] border border-slate-100 flex items-center justify-between group hover:shadow-xl transition-all duration-500">
+            <div className="flex items-center space-x-6">
+               <div className="w-14 h-14 bg-slate-50 rounded-2xl flex items-center justify-center text-slate-300 group-hover:bg-blue-50 group-hover:text-blue-500 transition"><Navigation className="w-6 h-6" /></div>
+               <div>
+                  <p className="font-black text-slate-900 text-lg">{(r.dropoff || 'Journey').split(',')[0]}</p>
+                  <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-1">{new Date(r.createdAt).toLocaleDateString()} • {r.status}</p>
+               </div>
             </div>
-          ))}
-        </div>
-      )}
+            <p className="text-2xl font-black text-slate-900 tracking-tighter">₦{(r.fare || 0).toLocaleString()}</p>
+          </div>
+        ))}
+      </div>
     </div>
   );
 };
@@ -544,17 +450,15 @@ const RiderHistory: React.FC = () => {
 const RiderWallet: React.FC = () => {
   const { currentUser } = useApp();
   return (
-    <div className="p-10 space-y-10 overflow-y-auto h-full pb-32">
+    <div className="p-10 max-w-5xl mx-auto space-y-10 h-full overflow-y-auto pb-32">
       <h2 className="text-4xl font-black text-slate-900 tracking-tight">Neural Wallet</h2>
-      <div className="bg-slate-900 p-12 rounded-[50px] text-white shadow-2xl shadow-slate-200 relative overflow-hidden group">
-        <div className="absolute top-0 right-0 p-12 opacity-10 group-hover:scale-110 transition-transform duration-1000">
-           <Zap className="w-48 h-48" />
-        </div>
+      <div className="bg-slate-900 p-12 rounded-[50px] text-white shadow-2xl relative overflow-hidden group">
+        <Zap className="absolute top-0 right-0 p-12 opacity-10 w-48 h-48 group-hover:scale-110 transition-transform duration-1000" />
         <p className="text-xs font-black uppercase tracking-[0.4em] opacity-40 mb-3">Available Balance</p>
         <p className="text-6xl font-black tracking-tighter">₦{(currentUser?.balance || 0).toLocaleString()}</p>
         <div className="mt-12 flex space-x-4">
-           <button className="bg-white text-slate-900 px-10 py-5 rounded-2xl font-black hover:bg-blue-600 hover:text-white transition-all active:scale-95 shadow-xl">Top Up Account</button>
-           <button className="bg-white/10 text-white px-10 py-5 rounded-2xl font-black hover:bg-white/20 transition-all active:scale-95 backdrop-blur-md">Auto-Reload</button>
+           <button className="bg-white text-slate-900 px-10 py-5 rounded-2xl font-black hover:bg-blue-600 hover:text-white transition-all shadow-xl">Top Up Account</button>
+           <button className="bg-white/10 text-white px-10 py-5 rounded-2xl font-black hover:bg-white/20 transition-all backdrop-blur-md">Auto-Reload</button>
         </div>
       </div>
     </div>
@@ -564,86 +468,19 @@ const RiderWallet: React.FC = () => {
 const RiderProfile: React.FC = () => {
   const { currentUser } = useApp();
   return (
-    <div className="p-10 space-y-10 overflow-y-auto h-full pb-32">
+    <div className="p-10 max-w-5xl mx-auto space-y-10 h-full overflow-y-auto pb-32">
       <h2 className="text-4xl font-black text-slate-900 tracking-tight">Identity Node</h2>
-      <div className="bg-white p-12 rounded-[50px] border border-slate-100 space-y-10 shadow-sm">
+      <div className="bg-white p-12 rounded-[50px] border border-slate-100 space-y-10">
         <div className="flex items-center space-x-8">
-          <div className="relative">
-             <div className="w-28 h-28 rounded-[40px] overflow-hidden bg-slate-100 border-4 border-slate-50 shadow-2xl">
-                <img src={currentUser?.avatar || `https://i.pravatar.cc/150?u=${currentUser?.id}`} className="w-full h-full object-cover" alt="Profile" />
-             </div>
-             <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-white p-2 rounded-xl border-4 border-white shadow-lg"><ShieldCheck className="w-5 h-5" /></div>
-          </div>
-          <div>
-             <p className="text-3xl font-black text-slate-900 tracking-tighter">{currentUser?.name || 'Speed Rider'}</p>
-             <p className="text-slate-400 font-bold text-lg">{currentUser?.email}</p>
-             <div className="mt-4 flex items-center space-x-2 bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full w-fit">
-                <Star className="w-4 h-4 fill-blue-600" />
-                <span className="font-black text-xs uppercase tracking-widest">Elite Member • 4.98</span>
-             </div>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-8 pt-10 border-t border-slate-50">
-           <div className="space-y-2">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Mobile Contact</p>
-              <p className="text-xl font-black text-slate-900">{currentUser?.phone || 'Not linked'}</p>
-           </div>
-           <div className="space-y-2">
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Payment Method</p>
-              <p className="text-xl font-black text-slate-900">Neural Pay (VISA)</p>
+           <img src={currentUser?.avatar} className="w-28 h-28 rounded-[40px] border-4 border-slate-50 shadow-2xl" />
+           <div>
+              <p className="text-3xl font-black text-slate-900 tracking-tighter">{currentUser?.name}</p>
+              <p className="text-slate-400 font-bold text-lg">{currentUser?.email}</p>
+              <div className="mt-4 inline-flex items-center space-x-2 bg-blue-50 text-blue-600 px-4 py-1.5 rounded-full font-black text-xs uppercase tracking-widest">Elite Member • 4.98</div>
            </div>
         </div>
       </div>
     </div>
-  );
-};
-
-const RiderDashboard: React.FC = () => {
-  const { logout, currentUser } = useApp();
-
-  if (!currentUser) return null;
-  
-  return (
-    <DashboardErrorBoundary>
-      <div className="flex h-screen bg-white overflow-hidden">
-        <div className="w-24 md:w-80 bg-white border-r border-slate-50 flex flex-col py-12 shrink-0">
-          <div className="mb-12 px-6 w-full flex justify-center md:justify-start">
-             <Logo className="h-12 w-auto" />
-          </div>
-          <nav className="flex-1 space-y-2 px-6">
-            {[
-              { to: '/rider', icon: Navigation, label: 'Move Now', end: true },
-              { to: '/rider/history', icon: History, label: 'History' },
-              { to: '/rider/wallet', icon: Wallet, label: 'Wallet Hub' },
-              { to: '/rider/profile', icon: UserIcon, label: 'Identity' },
-            ].map((item) => (
-              <NavLink 
-                key={item.to} to={item.to} end={item.end}
-                className={({ isActive }) => `flex items-center justify-center md:justify-start md:space-x-5 p-5 rounded-[24px] transition-all ${isActive ? 'bg-slate-900 text-white shadow-2xl shadow-slate-300' : 'text-slate-400 hover:bg-slate-50 hover:text-slate-900'}`}
-              >
-                <item.icon className="w-6 h-6 shrink-0" />
-                <span className="hidden md:block font-black uppercase tracking-[0.2em] text-[10px]">{item.label}</span>
-              </NavLink>
-            ))}
-          </nav>
-          <div className="px-6">
-             <button onClick={logout} className="flex items-center justify-center md:space-x-5 w-full p-5 rounded-[24px] text-red-400 hover:bg-red-50 transition-all font-black text-[10px] uppercase tracking-[0.2em]">
-                <LogOut className="w-6 h-6 shrink-0" />
-                <span className="hidden md:block">Terminate</span>
-             </button>
-          </div>
-        </div>
-        <div className="flex-1 relative bg-slate-50">
-          <Routes>
-            <Route index element={<RiderExplore />} />
-            <Route path="history" element={<RiderHistory />} />
-            <Route path="wallet" element={<RiderWallet />} />
-            <Route path="profile" element={<RiderProfile />} />
-          </Routes>
-        </div>
-      </div>
-    </DashboardErrorBoundary>
   );
 };
 
