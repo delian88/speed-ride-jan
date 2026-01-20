@@ -6,23 +6,38 @@ class MockDatabase {
   private prefix = 'speedride_db_';
 
   private get(table: string): any[] {
-    const data = localStorage.getItem(this.prefix + table);
-    return data ? JSON.parse(data) : [];
+    try {
+      const data = localStorage.getItem(this.prefix + table);
+      if (!data) return [];
+      const parsed = JSON.parse(data);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.error(`Database read error for ${table}:`, e);
+      return [];
+    }
   }
 
   private set(table: string, data: any[] | any): void {
-    localStorage.setItem(this.prefix + table, JSON.stringify(data));
+    try {
+      localStorage.setItem(this.prefix + table, JSON.stringify(data));
+    } catch (e) {
+      console.error(`Database write error for ${table}:`, e);
+    }
   }
 
   // Settings
   settings = {
     get: async (): Promise<{ pricePerKm: number }> => {
-      await this.delay(200);
-      const data = localStorage.getItem(this.prefix + 'settings');
-      return data ? JSON.parse(data) : { pricePerKm: 250 }; // Default 250 NGN/KM
+      await this.delay(100);
+      try {
+        const data = localStorage.getItem(this.prefix + 'settings');
+        return data ? JSON.parse(data) : { pricePerKm: 350 };
+      } catch {
+        return { pricePerKm: 350 };
+      }
     },
     update: async (updates: { pricePerKm: number }): Promise<void> => {
-      await this.delay(400);
+      await this.delay(200);
       this.set('settings', updates);
     }
   };
@@ -47,7 +62,7 @@ class MockDatabase {
       const newUser = {
         id: 'u_' + Math.random().toString(36).substr(2, 9),
         rating: 5.0,
-        balance: 0,
+        balance: 2500, // Starting bonus
         ...userData
       } as any;
       users.push(newUser);
@@ -108,12 +123,13 @@ class MockDatabase {
     }
   };
 
-  private delay(ms: number = 400) {
+  private delay(ms: number = 200) {
     return new Promise(res => setTimeout(res, ms));
   }
 
   init() {
-    if (this.get('users').length === 0) {
+    const users = this.get('users');
+    if (users.length === 0) {
       const seedUsers = [
         {
           id: 'u1',
