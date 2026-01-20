@@ -4,23 +4,231 @@ import { Routes, Route, NavLink } from 'react-router-dom';
 import { 
   Users, Car, TrendingUp, AlertCircle, ShieldCheck, 
   Settings, Search, X, Map, LayoutDashboard, 
-  Database, PieChart, LogOut, ShieldAlert, CheckCircle, Check, Eye, FileText, Image as ImageIcon
+  Database, PieChart, LogOut, ShieldAlert, CheckCircle, Check, Eye, FileText, Image as ImageIcon,
+  MoreVertical, Mail, Phone, Wallet, Star, Zap, DollarSign, Save
 } from 'lucide-react';
 import { useApp } from '../App';
 import { db } from '../database';
-import { Driver } from '../types';
+import { Driver, User, RideRequest } from '../types';
+
+const AdminSettings: React.FC = () => {
+  const [pricePerKm, setPricePerKm] = useState(350);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+  const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    db.settings.get().then(s => {
+      setPricePerKm(s.pricePerKm);
+      setIsLoading(false);
+    });
+  }, []);
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    await db.settings.update({ pricePerKm });
+    setIsSaving(false);
+    setMessage('Settings synchronized to edge nodes.');
+    setTimeout(() => setMessage(''), 3000);
+  };
+
+  if (isLoading) return <div className="p-20 text-center animate-pulse">Synchronizing Neural Core...</div>;
+
+  return (
+    <main className="p-12 space-y-12 animate-in fade-in duration-500">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-4xl font-black text-slate-900 tracking-tight">Platform Intelligence</h2>
+          <p className="text-slate-500 font-bold">Configure the platform's economic and neural parameters.</p>
+        </div>
+        {message && <div className="bg-emerald-50 text-emerald-600 px-6 py-3 rounded-2xl font-black text-xs animate-bounce">{message}</div>}
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-12">
+        <form onSubmit={handleSave} className="bg-white p-10 rounded-[50px] border border-slate-100 shadow-sm space-y-10">
+           <div className="flex items-center space-x-4 mb-4">
+              <div className="p-4 bg-blue-50 text-blue-600 rounded-3xl"><TrendingUp className="w-6 h-6" /></div>
+              <h3 className="text-2xl font-black text-slate-900">Economic Engine</h3>
+           </div>
+           
+           <div className="space-y-6">
+              <div className="space-y-2">
+                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-4">Price Per Kilometer (NGN)</label>
+                 <div className="relative">
+                    <div className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-300 text-lg">₦</div>
+                    <input 
+                      type="number"
+                      value={pricePerKm}
+                      onChange={e => setPricePerKm(Number(e.target.value))}
+                      className="w-full pl-12 pr-6 py-5 bg-slate-50 border-none rounded-3xl font-black text-2xl text-slate-900 outline-none focus:ring-4 focus:ring-blue-600/10 transition"
+                    />
+                 </div>
+                 <p className="text-xs text-slate-400 font-bold ml-4">This value directly impacts the base fare calculation across all vehicle types.</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Elite Multiplier</p>
+                    <p className="text-xl font-black text-slate-900">2.2x</p>
+                 </div>
+                 <div className="p-6 bg-slate-50 rounded-3xl border border-slate-100">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Minimum Base</p>
+                    <p className="text-xl font-black text-slate-900">₦500.00</p>
+                 </div>
+              </div>
+           </div>
+
+           <button 
+            type="submit" 
+            disabled={isSaving}
+            className="w-full bg-slate-900 text-white font-black py-5 rounded-[30px] shadow-2xl hover:bg-blue-600 transition flex items-center justify-center space-x-3"
+           >
+             <Save className="w-5 h-5" />
+             <span>{isSaving ? 'Syncing...' : 'Commit Settings'}</span>
+           </button>
+        </form>
+
+        <div className="space-y-8">
+           <div className="bg-blue-600 p-10 rounded-[50px] text-white space-y-6 relative overflow-hidden shadow-2xl shadow-blue-200">
+              <div className="absolute -top-10 -right-10 w-48 h-48 bg-white/10 rounded-full blur-3xl" />
+              <h3 className="text-xl font-black">Platform Health</h3>
+              <div className="grid grid-cols-2 gap-4">
+                 <div className="bg-white/10 p-4 rounded-2xl border border-white/5">
+                    <p className="text-[10px] font-black opacity-60 uppercase tracking-widest mb-1">Latency</p>
+                    <p className="text-2xl font-black">24ms</p>
+                 </div>
+                 <div className="bg-white/10 p-4 rounded-2xl border border-white/5">
+                    <p className="text-[10px] font-black opacity-60 uppercase tracking-widest mb-1">Nodes</p>
+                    <p className="text-2xl font-black">Active</p>
+                 </div>
+              </div>
+              <p className="text-xs font-bold opacity-80 leading-relaxed">Economic changes propagate to rider apps within 500ms of commitment. Ensure rate parity with local competitors before saving.</p>
+           </div>
+        </div>
+      </div>
+    </main>
+  );
+};
+
+const AdminRiders: React.FC = () => {
+  const [riders, setRiders] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    db.users.getAll().then(all => {
+      setRiders(all.filter(u => u.role === 'RIDER'));
+      setLoading(false);
+    });
+  }, []);
+
+  return (
+    <main className="p-12 animate-in fade-in duration-500">
+       <div className="bg-white rounded-[40px] border border-slate-100 overflow-hidden shadow-sm">
+          <div className="p-10 flex justify-between items-center">
+             <h3 className="text-3xl font-black text-slate-900 tracking-tight">Rider Registry</h3>
+             <div className="bg-blue-50 text-blue-600 px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest">{riders.length} Registered</div>
+          </div>
+          <div className="overflow-x-auto">
+             <table className="w-full text-left">
+                <tr className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
+                   <th className="px-10 py-6">Rider Name</th>
+                   <th className="px-10 py-6">Contact Info</th>
+                   <th className="px-10 py-6">Wallet Balance</th>
+                   <th className="px-10 py-6">Rating</th>
+                </tr>
+                {riders.map(rider => (
+                  <tr key={rider.id} className="border-t border-slate-50 hover:bg-slate-50 transition">
+                     <td className="px-10 py-6">
+                        <div className="flex items-center space-x-4">
+                           <img src={rider.avatar} className="w-12 h-12 rounded-xl" />
+                           <p className="font-black text-slate-900">{rider.name}</p>
+                        </div>
+                     </td>
+                     <td className="px-10 py-6">
+                        <p className="text-xs font-bold text-slate-600">{rider.email}</p>
+                        <p className="text-[10px] text-slate-400 font-bold">{rider.phone}</p>
+                     </td>
+                     <td className="px-10 py-6 font-black text-slate-900">₦{rider.balance.toLocaleString()}</td>
+                     <td className="px-10 py-6">
+                        <div className="flex items-center space-x-1 text-indigo-600 font-black"><Star className="w-3 h-3 fill-indigo-600" /> <span>{rider.rating}</span></div>
+                     </td>
+                  </tr>
+                ))}
+             </table>
+          </div>
+       </div>
+    </main>
+  );
+};
+
+const AdminFleet: React.FC = () => {
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    db.users.getAll().then(all => {
+      setDrivers(all.filter(u => u.role === 'DRIVER') as Driver[]);
+      setLoading(false);
+    });
+  }, []);
+
+  return (
+    <main className="p-12 animate-in fade-in duration-500">
+       <div className="bg-white rounded-[40px] border border-slate-100 overflow-hidden shadow-sm">
+          <div className="p-10 flex justify-between items-center">
+             <h3 className="text-3xl font-black text-slate-900 tracking-tight">Active Fleet Control</h3>
+             <div className="flex space-x-4">
+                <div className="bg-emerald-50 text-emerald-600 px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest">{drivers.filter(d => d.isOnline).length} Online</div>
+                <div className="bg-blue-50 text-blue-600 px-6 py-2 rounded-xl text-xs font-black uppercase tracking-widest">{drivers.length} Total</div>
+             </div>
+          </div>
+          <div className="overflow-x-auto">
+             <table className="w-full text-left">
+                <tr className="bg-slate-50 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
+                   <th className="px-10 py-6">Driver Profile</th>
+                   <th className="px-10 py-6">Vehicle Intelligence</th>
+                   <th className="px-10 py-6">Status</th>
+                   <th className="px-10 py-6">Commission Balance</th>
+                </tr>
+                {drivers.map(driver => (
+                  <tr key={driver.id} className="border-t border-slate-50 hover:bg-slate-50 transition">
+                     <td className="px-10 py-6">
+                        <div className="flex items-center space-x-4">
+                           <img src={driver.avatar} className="w-12 h-12 rounded-xl" />
+                           <div><p className="font-black text-slate-900">{driver.name}</p><p className="text-[10px] text-slate-400 font-bold">{driver.email}</p></div>
+                        </div>
+                     </td>
+                     <td className="px-10 py-6">
+                        <p className="text-xs font-black text-slate-700">{driver.vehicleModel}</p>
+                        <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest">{driver.plateNumber}</p>
+                     </td>
+                     <td className="px-10 py-6">
+                        <span className={`text-[10px] font-black uppercase px-3 py-1 rounded-full ${driver.isOnline ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-400'}`}>
+                           {driver.isOnline ? 'Transmitting' : 'Dormant'}
+                        </span>
+                     </td>
+                     <td className="px-10 py-6 font-black text-slate-900">₦{driver.balance.toLocaleString()}</td>
+                  </tr>
+                ))}
+             </table>
+          </div>
+       </div>
+    </main>
+  );
+};
 
 const AdminOverview: React.FC<{ stats: any, pendingDrivers: Driver[], handleVerification: (id: string, app: boolean) => void, loading: boolean }> = ({ stats, pendingDrivers, handleVerification, loading }) => {
   const [selectedDriver, setSelectedDriver] = useState<Driver | null>(null);
 
   return (
-    <main className="p-12 space-y-12 animate-in fade-in duration-500">
+    <main className="p-12 space-y-12 animate-in fade-in duration-500 overflow-y-auto h-full pb-32">
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
         {[
-          { label: 'Active Sessions', value: stats.activeRides.toLocaleString(), change: '+12%', icon: Car },
-          { label: 'Gross Revenue', value: '₦' + (stats.revenue/1000000).toFixed(1) + 'M', change: '+8%', icon: TrendingUp },
-          { label: 'New Partners', value: stats.newUsers.toString(), change: '+24%', icon: Users },
-          { label: 'System Alerts', value: stats.alerts.toString(), icon: AlertCircle },
+          { label: 'Network Sessions', value: stats.activeRides.toLocaleString(), change: '+12%', icon: Car },
+          { label: 'Gross Volume', value: '₦' + (stats.revenue/1000000).toFixed(1) + 'M', change: '+8%', icon: TrendingUp },
+          { label: 'Node Expansion', value: stats.newUsers.toString(), change: '+24%', icon: Users },
+          { label: 'Neural Alerts', value: stats.alerts.toString(), icon: AlertCircle },
         ].map((stat, i) => (
           <div key={i} className="bg-white p-8 rounded-[40px] shadow-sm border border-slate-50 hover:shadow-2xl transition duration-500">
             <div className="flex justify-between items-start mb-6">
@@ -40,8 +248,8 @@ const AdminOverview: React.FC<{ stats: any, pendingDrivers: Driver[], handleVeri
           <div className="flex items-center space-x-4">
              <ShieldAlert className="w-8 h-8 text-blue-600" />
              <div>
-                <h3 className="text-2xl font-black text-slate-900">Partner Verification</h3>
-                <p className="text-slate-500 font-bold text-sm">Review pending driver applications for compliance.</p>
+                <h3 className="text-2xl font-black text-slate-900">Partner Compliance</h3>
+                <p className="text-slate-500 font-bold text-sm">Review pending driver applications for biometric and document approval.</p>
              </div>
           </div>
           <span className="bg-blue-600 text-white text-xs font-black px-4 py-2 rounded-xl shadow-lg shadow-blue-500/20">{pendingDrivers.length} PENDING</span>
@@ -52,17 +260,17 @@ const AdminOverview: React.FC<{ stats: any, pendingDrivers: Driver[], handleVeri
           ) : pendingDrivers.length === 0 ? (
             <div className="p-20 text-center space-y-4">
                <CheckCircle className="w-16 h-16 text-emerald-500 mx-auto" />
-               <p className="text-xl font-black text-slate-900">Queue Clear!</p>
-               <p className="text-slate-500 font-bold">All driver applications have been processed.</p>
+               <p className="text-xl font-black text-slate-900">Queue Purged!</p>
+               <p className="text-slate-500 font-bold">All driver applications have been successfully processed.</p>
             </div>
           ) : (
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-slate-50/50 text-slate-400 text-[10px] font-black uppercase tracking-[0.2em]">
-                  <th className="px-10 py-6">Applicant Profile</th>
-                  <th className="px-10 py-6">Hardware Details</th>
-                  <th className="px-10 py-6">Documents</th>
-                  <th className="px-10 py-6 text-right">Decision</th>
+                  <th className="px-10 py-6">Applicant Node</th>
+                  <th className="px-10 py-6">Mobile Unit</th>
+                  <th className="px-10 py-6">Telemetry</th>
+                  <th className="px-10 py-6 text-right">Verification</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
@@ -89,7 +297,7 @@ const AdminOverview: React.FC<{ stats: any, pendingDrivers: Driver[], handleVeri
                         className="flex items-center space-x-2 text-blue-600 font-black text-xs hover:underline uppercase tracking-widest"
                        >
                          <Eye className="w-4 h-4" />
-                         <span>View Docs</span>
+                         <span>Analyze Data</span>
                        </button>
                     </td>
                     <td className="px-10 py-8 text-right">
@@ -98,7 +306,7 @@ const AdminOverview: React.FC<{ stats: any, pendingDrivers: Driver[], handleVeri
                             onClick={() => handleVerification(driver.id, true)}
                             className="px-6 py-3 bg-emerald-500 text-white font-black text-xs rounded-xl shadow-lg shadow-emerald-500/20 hover:bg-emerald-600 transition"
                          >
-                            APPROVE
+                            AUTHORIZE
                          </button>
                          <button className="p-3 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition"><X className="w-6 h-6" /></button>
                        </div>
@@ -114,74 +322,74 @@ const AdminOverview: React.FC<{ stats: any, pendingDrivers: Driver[], handleVeri
       {/* Document Preview Modal */}
       {selectedDriver && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 sm:p-12">
-           <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setSelectedDriver(null)}></div>
-           <div className="relative w-full max-w-4xl bg-white rounded-[50px] shadow-2xl border border-white p-10 max-h-[90vh] overflow-y-auto animate-in zoom-in duration-300">
+           <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-xl" onClick={() => setSelectedDriver(null)}></div>
+           <div className="relative w-full max-w-4xl bg-white rounded-[60px] shadow-2xl border border-white p-12 max-h-[90vh] overflow-y-auto animate-in zoom-in duration-300">
               <button 
                 onClick={() => setSelectedDriver(null)}
-                className="absolute top-8 right-8 p-3 bg-slate-100 hover:bg-red-50 hover:text-red-500 rounded-2xl transition"
+                className="absolute top-10 right-10 p-3 bg-slate-100 hover:bg-red-50 hover:text-red-500 rounded-2xl transition"
               >
                 <X className="w-6 h-6" />
               </button>
               
-              <div className="flex items-center space-x-6 mb-12">
-                 <img src={selectedDriver.avatar} className="w-20 h-20 rounded-3xl border-4 border-slate-50" />
+              <div className="flex items-center space-x-8 mb-16">
+                 <img src={selectedDriver.avatar} className="w-24 h-24 rounded-[40px] border-4 border-slate-50 shadow-2xl" />
                  <div>
-                    <h3 className="text-3xl font-black text-slate-900">{selectedDriver.name}</h3>
-                    <p className="text-slate-500 font-bold uppercase tracking-widest text-sm">Partner Verification ID: {selectedDriver.id}</p>
+                    <h3 className="text-4xl font-black text-slate-900 tracking-tight">{selectedDriver.name}</h3>
+                    <p className="text-blue-600 font-black uppercase tracking-[0.2em] text-xs">Compliance Core v4.2 • ID: {selectedDriver.id}</p>
                  </div>
               </div>
 
-              <div className="grid md:grid-cols-2 gap-12">
-                 <div className="space-y-6">
-                    <div className="flex items-center space-x-3">
-                       <ShieldCheck className="w-6 h-6 text-blue-600" />
-                       <h4 className="font-black text-xl text-slate-900">Driver's License</h4>
+              <div className="grid md:grid-cols-2 gap-16">
+                 <div className="space-y-8">
+                    <div className="flex items-center space-x-4">
+                       <div className="p-4 bg-indigo-50 text-indigo-600 rounded-3xl"><ShieldCheck className="w-8 h-8" /></div>
+                       <h4 className="font-black text-2xl text-slate-900">Driver's License</h4>
                     </div>
-                    <div className="aspect-[3/2] bg-slate-100 rounded-[32px] overflow-hidden border-2 border-slate-50 shadow-inner group relative">
+                    <div className="aspect-[4/3] bg-slate-100 rounded-[50px] overflow-hidden border-8 border-white shadow-2xl group relative">
                        {selectedDriver.licenseDoc ? (
-                         <img src={selectedDriver.licenseDoc} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt="License" />
+                         <img src={selectedDriver.licenseDoc} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" alt="License" />
                        ) : (
                          <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                           <FileText className="w-12 h-12 mb-2" />
-                           <p className="font-bold">No Image Uploaded</p>
+                           <FileText className="w-16 h-16 mb-4 opacity-20" />
+                           <p className="font-black uppercase tracking-widest text-xs">Missing Asset</p>
                          </div>
                        )}
                     </div>
                  </div>
                  
-                 <div className="space-y-6">
-                    <div className="flex items-center space-x-3">
-                       <Users className="w-6 h-6 text-blue-600" />
-                       <h4 className="font-black text-xl text-slate-900">National ID (NIN)</h4>
+                 <div className="space-y-8">
+                    <div className="flex items-center space-x-4">
+                       <div className="p-4 bg-indigo-50 text-indigo-600 rounded-3xl"><Users className="w-8 h-8" /></div>
+                       <h4 className="font-black text-2xl text-slate-900">Biometric ID (NIN)</h4>
                     </div>
-                    <div className="aspect-[3/2] bg-slate-100 rounded-[32px] overflow-hidden border-2 border-slate-50 shadow-inner group relative">
+                    <div className="aspect-[4/3] bg-slate-100 rounded-[50px] overflow-hidden border-8 border-white shadow-2xl group relative">
                        {selectedDriver.ninDoc ? (
-                         <img src={selectedDriver.ninDoc} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" alt="NIN" />
+                         <img src={selectedDriver.ninDoc} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-1000" alt="NIN" />
                        ) : (
                          <div className="flex flex-col items-center justify-center h-full text-slate-400">
-                           <ImageIcon className="w-12 h-12 mb-2" />
-                           <p className="font-bold">No Image Uploaded</p>
+                           <ImageIcon className="w-16 h-16 mb-4 opacity-20" />
+                           <p className="font-black uppercase tracking-widest text-xs">Missing Asset</p>
                          </div>
                        )}
                     </div>
                  </div>
               </div>
 
-              <div className="mt-12 pt-10 border-t border-slate-100 flex justify-end space-x-4">
+              <div className="mt-20 pt-12 border-t border-slate-100 flex justify-end space-x-6">
                  <button 
                   onClick={() => setSelectedDriver(null)}
-                  className="px-10 py-5 bg-slate-100 text-slate-600 font-black rounded-2xl hover:bg-slate-200 transition"
+                  className="px-12 py-6 bg-slate-100 text-slate-600 font-black rounded-3xl hover:bg-slate-200 transition uppercase tracking-widest text-xs"
                  >
-                   CLOSE PREVIEW
+                   Defer Decision
                  </button>
                  <button 
                   onClick={() => {
                     handleVerification(selectedDriver.id, true);
                     setSelectedDriver(null);
                   }}
-                  className="px-10 py-5 bg-blue-600 text-white font-black rounded-2xl hover:bg-blue-700 transition shadow-2xl shadow-blue-500/20"
+                  className="px-12 py-6 bg-blue-600 text-white font-black rounded-3xl hover:bg-blue-700 transition shadow-[0_25px_50px_-12px_rgba(59,130,246,0.4)] uppercase tracking-widest text-xs"
                  >
-                   APPROVE PARTNER
+                   Validate Node
                  </button>
               </div>
            </div>
@@ -195,33 +403,42 @@ const AdminDashboard: React.FC = () => {
   const { logout } = useApp();
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
-  const [stats] = useState({
-    activeRides: 1248,
-    revenue: 12450000,
-    newUsers: 452,
+  const [stats, setStats] = useState({
+    activeRides: 0,
+    revenue: 0,
+    newUsers: 0,
     alerts: 3
   });
 
-  useEffect(() => { loadDrivers(); }, []);
+  useEffect(() => { 
+    loadInitialData(); 
+  }, []);
 
-  const loadDrivers = async () => {
+  const loadInitialData = async () => {
     const allUsers = await db.users.getAll();
+    const allRides = await db.rides.getAll();
     const allDrivers = allUsers.filter(u => u.role === 'DRIVER') as Driver[];
+    
     setDrivers(allDrivers);
+    setStats({
+       activeRides: allRides.filter(r => r.status !== 'COMPLETED').length,
+       revenue: allRides.reduce((acc, r) => acc + r.fare, 0),
+       newUsers: allUsers.length,
+       alerts: allDrivers.filter(d => !d.isVerified).length
+    });
     setLoading(false);
   };
 
   const handleVerification = async (id: string, approve: boolean) => {
     await db.users.update(id, { isVerified: approve });
-    await loadDrivers();
+    await loadInitialData();
   };
 
   const navItems = [
-    { to: '/admin', icon: LayoutDashboard, label: 'Summary', end: true },
-    { to: '/admin/riders', icon: Users, label: 'Riders' },
-    { to: '/admin/drivers', icon: Car, label: 'Fleet' },
-    { to: '/admin/map', icon: Map, label: 'Traffic' },
-    { to: '/admin/financials', icon: Database, label: 'Finance' },
+    { to: '/admin', icon: LayoutDashboard, label: 'Neural Matrix', end: true },
+    { to: '/admin/riders', icon: Users, label: 'Rider Nodes' },
+    { to: '/admin/drivers', icon: Car, label: 'Fleet Matrix' },
+    { to: '/admin/settings', icon: Settings, label: 'Intel Core' },
   ];
 
   return (
@@ -244,28 +461,27 @@ const AdminDashboard: React.FC = () => {
               <span>{item.label}</span>
             </NavLink>
           ))}
-          <button onClick={logout} className="mt-10 flex items-center space-x-4 w-full p-4 rounded-2xl hover:bg-red-500/10 text-red-400 transition font-bold text-sm"><LogOut className="w-5 h-5" /> <span>Terminate Session</span></button>
+          <button onClick={logout} className="mt-10 flex items-center space-x-4 w-full p-4 rounded-2xl hover:bg-red-500/10 text-red-400 transition font-bold text-sm"><LogOut className="w-5 h-5" /> <span>Terminate Matrix</span></button>
         </nav>
       </div>
 
       <div className="flex-1 flex flex-col overflow-hidden bg-white">
         <header className="h-24 bg-white border-b border-slate-100 px-12 flex items-center justify-between sticky top-0 z-20 shrink-0">
-           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Enterprise Console</h1>
+           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Enterprise Console v4.2</h1>
            <div className="flex items-center space-x-6">
               <div className="relative group">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-blue-600 transition" />
-                <input placeholder="Global Search..." className="pl-12 pr-6 py-3 bg-slate-50 border-none rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-600 w-80 transition" />
+                <input placeholder="Neural Search..." className="pl-12 pr-6 py-3 bg-slate-50 border-none rounded-2xl text-sm font-bold outline-none focus:ring-2 focus:ring-blue-600 w-80 transition" />
               </div>
            </div>
         </header>
 
-        <div className="flex-1 overflow-y-auto relative">
+        <div className="flex-1 overflow-hidden relative">
           <Routes>
             <Route path="/" element={<AdminOverview stats={stats} pendingDrivers={drivers.filter(d => !d.isVerified)} handleVerification={handleVerification} loading={loading} />} />
-            <Route path="/riders" element={<div className="p-12"><h2 className="text-4xl font-black">Rider Management</h2></div>} />
-            <Route path="/drivers" element={<div className="p-12"><h2 className="text-4xl font-black">Fleet Fleet Control</h2></div>} />
-            <Route path="/map" element={<div className="p-12"><h2 className="text-4xl font-black">Global Traffic Map</h2></div>} />
-            <Route path="/financials" element={<div className="p-12"><h2 className="text-4xl font-black">Revenue Analytics</h2></div>} />
+            <Route path="/riders" element={<AdminRiders />} />
+            <Route path="/drivers" element={<AdminFleet />} />
+            <Route path="/settings" element={<AdminSettings />} />
           </Routes>
         </div>
       </div>

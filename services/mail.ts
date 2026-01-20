@@ -44,7 +44,9 @@ export const sendWelcomeEmail = async ({ email, name, role }: MailOptions) => {
   triggerVirtualInterceptor(subject, isDriver ? "Verification is pending." : "Start riding today.");
 
   try {
-    const response = await (window as any).Email.send({
+    const Email = (window as any).Email;
+    if (!Email) return false;
+    const response = await Email.send({
       ...SMTP_CONFIG,
       To: email,
       Subject: subject,
@@ -76,13 +78,48 @@ export const sendOtpEmail = async (email: string, otp: string) => {
   triggerVirtualInterceptor(subject, plainText, otp);
 
   try {
-    const response = await (window as any).Email.send({
+    const Email = (window as any).Email;
+    if (!Email) return false;
+    const response = await Email.send({
       ...SMTP_CONFIG,
       To: email,
       Subject: subject,
       Body: body
     });
-    console.log("SmtpJS OTP Response:", response);
+    return response === 'OK';
+  } catch (error) {
+    console.error("SmtpJS Error:", error);
+    return false;
+  }
+};
+
+export const sendResetEmail = async (email: string, otp: string) => {
+  const subject = `Reset Your SpeedRide Password | ${otp}`;
+  const plainText = `You requested a password reset. Your temporary verification code is ${otp}.`;
+  const body = `
+    <div style="font-family: Arial, sans-serif; padding: 40px; text-align: center; background-color: #f1f5f9;">
+      <div style="background-color: white; padding: 40px; border-radius: 32px; max-width: 450px; margin: auto; border: 1px solid #e2e8f0;">
+        <h2 style="color: #0f172a; margin-bottom: 10px;">Password Recovery</h2>
+        <p style="color: #64748b;">Enter the code below in the SpeedRide app to reset your password.</p>
+        <div style="background: #2563eb; color: white; padding: 20px; border-radius: 16px; margin: 30px 0; font-size: 32px; font-weight: 900; letter-spacing: 4px;">
+          ${otp}
+        </div>
+        <p style="font-size: 12px; color: #94a3b8;">This code will expire in 15 minutes. If you did not request this, please secure your account immediately.</p>
+      </div>
+    </div>
+  `;
+
+  triggerVirtualInterceptor("Password Recovery Transmission", plainText, otp);
+
+  try {
+    const Email = (window as any).Email;
+    if (!Email) return false;
+    const response = await Email.send({
+      ...SMTP_CONFIG,
+      To: email,
+      Subject: subject,
+      Body: body
+    });
     return response === 'OK';
   } catch (error) {
     console.error("SmtpJS Error:", error);

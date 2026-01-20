@@ -10,9 +10,22 @@ class MockDatabase {
     return data ? JSON.parse(data) : [];
   }
 
-  private set(table: string, data: any[]): void {
+  private set(table: string, data: any[] | any): void {
     localStorage.setItem(this.prefix + table, JSON.stringify(data));
   }
+
+  // Settings
+  settings = {
+    get: async (): Promise<{ pricePerKm: number }> => {
+      await this.delay(200);
+      const data = localStorage.getItem(this.prefix + 'settings');
+      return data ? JSON.parse(data) : { pricePerKm: 250 }; // Default 250 NGN/KM
+    },
+    update: async (updates: { pricePerKm: number }): Promise<void> => {
+      await this.delay(400);
+      this.set('settings', updates);
+    }
+  };
 
   // Users Table
   users = {
@@ -23,6 +36,10 @@ class MockDatabase {
     getById: async (id: string): Promise<User | undefined> => {
       await this.delay();
       return this.get('users').find(u => u.id === id);
+    },
+    getByEmail: async (email: string): Promise<User | undefined> => {
+      await this.delay();
+      return this.get('users').find(u => u.email.toLowerCase() === email.toLowerCase());
     },
     create: async (userData: Partial<User | Driver>): Promise<User | Driver> => {
       await this.delay();
@@ -45,6 +62,15 @@ class MockDatabase {
       users[idx] = { ...users[idx], ...updates };
       this.set('users', users);
       return users[idx];
+    },
+    updatePassword: async (email: string, newPassword: string): Promise<boolean> => {
+      await this.delay();
+      const users = this.get('users');
+      const idx = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+      if (idx === -1) return false;
+      users[idx].password = newPassword; 
+      this.set('users', users);
+      return true;
     }
   };
 
@@ -63,6 +89,10 @@ class MockDatabase {
       this.set('rides', rides);
       return newRide;
     },
+    getAll: async (): Promise<RideRequest[]> => {
+      await this.delay();
+      return this.get('rides');
+    },
     getByUser: async (userId: string): Promise<RideRequest[]> => {
       await this.delay();
       return this.get('rides').filter((r: RideRequest) => r.riderId === userId || r.driverId === userId);
@@ -78,11 +108,10 @@ class MockDatabase {
     }
   };
 
-  private delay(ms: number = 800) {
+  private delay(ms: number = 400) {
     return new Promise(res => setTimeout(res, ms));
   }
 
-  // Initialize with seed data if empty
   init() {
     if (this.get('users').length === 0) {
       const seedUsers = [
@@ -90,6 +119,7 @@ class MockDatabase {
           id: 'u1',
           name: 'Demo Rider',
           email: 'rider@speedride.com',
+          password: 'password123',
           phone: '+234 801 234 5678',
           role: 'RIDER',
           avatar: 'https://i.pravatar.cc/150?u=rider',
@@ -100,6 +130,7 @@ class MockDatabase {
           id: 'd1',
           name: 'Adebayo Tunde',
           email: 'driver@speedride.com',
+          password: 'password123',
           phone: '+234 802 345 6789',
           role: 'DRIVER',
           avatar: 'https://i.pravatar.cc/150?u=driver',
@@ -115,6 +146,7 @@ class MockDatabase {
           id: 'a1',
           name: 'Super Admin',
           email: 'admin@speedride.com',
+          password: 'password123',
           phone: '+234 803 000 0000',
           role: 'ADMIN',
           avatar: 'https://i.pravatar.cc/150?u=admin',
@@ -123,6 +155,10 @@ class MockDatabase {
         }
       ];
       this.set('users', seedUsers);
+    }
+    
+    if (!localStorage.getItem(this.prefix + 'settings')) {
+      this.set('settings', { pricePerKm: 350 });
     }
   }
 }

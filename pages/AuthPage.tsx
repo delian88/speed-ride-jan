@@ -3,12 +3,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../App';
 import { db } from '../database';
-import { sendWelcomeEmail, sendOtpEmail } from '../services/mail';
+import { sendWelcomeEmail, sendOtpEmail, sendResetEmail } from '../services/mail';
 import { 
   Mail, Lock, Phone, User as UserIcon, Shield, 
   ChevronRight, Zap, ChevronLeft,
   FileText, Car, Smartphone, AlertCircle, Upload, CheckCircle as CheckCircleIcon, Image as ImageIcon,
-  Wifi, Info
+  Wifi, Info, RefreshCw
 } from 'lucide-react';
 import Logo from '../components/Logo';
 
@@ -27,6 +27,7 @@ const AuthPage: React.FC = () => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
+    confirmPassword: '',
     phone: '',
     name: '',
     vehicleModel: '',
@@ -49,8 +50,8 @@ const AuthPage: React.FC = () => {
   useEffect(() => {
     const handleMailIntercept = (e: any) => {
       setInterceptedMail(e.detail);
-      // Auto-dismiss after 8 seconds
-      setTimeout(() => setInterceptedMail(null), 8000);
+      // Auto-dismiss after 12 seconds
+      setTimeout(() => setInterceptedMail(null), 12000);
     };
     window.addEventListener('speedride_mail_intercept', handleMailIntercept);
     return () => window.removeEventListener('speedride_mail_intercept', handleMailIntercept);
@@ -80,9 +81,8 @@ const AuthPage: React.FC = () => {
     setIsLoading(true);
     setError('');
     try {
-      const users = await db.users.getAll();
-      const user = users.find(u => u.email === formData.email && u.role === role);
-      if (user) {
+      const user = await db.users.getByEmail(formData.email);
+      if (user && (user as any).password === formData.password && user.role === role) {
         login(user);
         navigate(`/${role.toLowerCase()}`);
       } else {
@@ -105,8 +105,8 @@ const AuthPage: React.FC = () => {
     setIsLoading(true);
     setError('');
     try {
-      const users = await db.users.getAll();
-      if (users.find(u => u.email === formData.email)) {
+      const existing = await db.users.getByEmail(formData.email);
+      if (existing) {
         setError("User already exists with this email.");
         setIsLoading(false);
         return;
@@ -123,6 +123,61 @@ const AuthPage: React.FC = () => {
     }
   };
 
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsLoading(true);
+    setError('');
+    try {
+      const user = await db.users.getByEmail(formData.email);
+      if (!user) {
+        setError("No account found with this email address.");
+        setIsLoading(false);
+        return;
+      }
+
+      const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      setCorrectOtp(newOtp);
+      await sendResetEmail(formData.email, newOtp);
+      setView('RESET');
+    } catch (err) {
+      setError("Failed to initiate recovery.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const enteredOtp = otp.join('');
+    if (enteredOtp !== correctOtp) {
+      setError("Invalid security code.");
+      return;
+    }
+    if (formData.password !== formData.confirmPassword) {
+      setError("Passwords do not match.");
+      return;
+    }
+    if (formData.password.length < 6) {
+      setError("Password must be at least 6 characters.");
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const success = await db.users.updatePassword(formData.email, formData.password);
+      if (success) {
+        setView('SUCCESS');
+        setTimeout(() => setView('LOGIN'), 3000);
+      } else {
+        setError("Failed to update password.");
+      }
+    } catch (err) {
+      setError("An unexpected error occurred.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleVerifyOtp = async () => {
     const enteredOtp = otp.join('');
     if (enteredOtp !== correctOtp) {
@@ -133,10 +188,12 @@ const AuthPage: React.FC = () => {
     setIsLoading(true);
     setError('');
     try {
+      // Fix: Cast the object to any to allow the 'password' property in the mock database create call
       const newUser = await db.users.create({
         name: formData.name,
         email: formData.email,
         phone: formData.phone,
+        password: formData.password,
         role: role,
         avatar: `https://i.pravatar.cc/150?u=${formData.email}`,
         ...(role === 'DRIVER' ? {
@@ -148,7 +205,7 @@ const AuthPage: React.FC = () => {
           licenseDoc: formData.licenseDoc,
           ninDoc: formData.ninDoc
         } : {})
-      });
+      } as any);
 
       if (role !== 'ADMIN') {
         await sendWelcomeEmail({
@@ -188,11 +245,56 @@ const AuthPage: React.FC = () => {
         return (
           <div className="text-center py-10 space-y-6 animate-in zoom-in duration-500">
             <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto shadow-lg">
-              <Logo className="h-12 w-auto" />
+              <CheckCircleIcon className="h-10 w-10" />
             </div>
-            <h2 className="text-3xl font-black text-slate-900">Verified!</h2>
-            <p className="text-slate-500 font-bold">Account created successfully. A welcome transmission has been intercepted.</p>
+            <h2 className="text-3xl font-black text-slate-900">Success!</h2>
+            <p className="text-slate-500 font-bold">Operation completed. You're being redirected...</p>
           </div>
+        );
+
+      case 'FORGOT':
+        return (
+          <form onSubmit={handleForgotPassword} className="space-y-6 animate-in fade-in duration-500">
+            <button type="button" onClick={() => setView('LOGIN')} className="flex items-center text-slate-400 font-black text-xs uppercase tracking-widest hover:text-blue-600 transition">
+              <ChevronLeft className="w-4 h-4 mr-1" /> Back to Login
+            </button>
+            <h2 className="text-2xl font-black text-slate-900 text-center">Recover Account</h2>
+            <p className="text-slate-500 font-medium text-center text-sm px-4">Enter your email and we'll transmit a secure recovery code to your inbox.</p>
+            <div className="relative">
+              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+              <input name="email" type="email" placeholder="Email Address" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
+            </div>
+            {error && <div className="text-red-600 text-xs font-bold bg-red-50 p-3 rounded-lg text-center">{error}</div>}
+            <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-blue-600 transition shadow-xl" disabled={isLoading}>{isLoading ? "Processing Request..." : "Send Recovery Code"}</button>
+          </form>
+        );
+
+      case 'RESET':
+        return (
+          <form onSubmit={handleResetPassword} className="space-y-6 animate-in fade-in duration-500">
+            <h2 className="text-2xl font-black text-slate-900 text-center">Set New Password</h2>
+            <div className="flex justify-center space-x-2 mb-6">
+              {otp.map((digit, i) => (
+                <input
+                  key={i} id={`otp-${i}`} type="text" maxLength={1} value={digit}
+                  onChange={(e) => handleOtpChange(i, e.target.value)}
+                  className={`w-10 h-14 text-center text-xl font-black bg-slate-50 border-2 rounded-xl focus:border-blue-600 outline-none transition border-slate-100`}
+                />
+              ))}
+            </div>
+            <div className="space-y-4">
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                <input name="password" type="password" placeholder="New Password" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
+                <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
+              </div>
+            </div>
+            {error && <div className="text-red-600 text-xs font-bold bg-red-50 p-3 rounded-lg text-center">{error}</div>}
+            <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition shadow-xl" disabled={isLoading}>{isLoading ? "Resetting Password..." : "Update Password"}</button>
+          </form>
         );
 
       case 'OTP':
@@ -205,7 +307,6 @@ const AuthPage: React.FC = () => {
             <div className="text-slate-500 font-medium leading-relaxed px-4 space-y-2">
               <p>Intercepting secure code for:</p>
               <p className="text-slate-900 font-black py-1 px-3 bg-blue-50 rounded-lg inline-block">{formData.email}</p>
-              <p className="text-xs text-blue-600 font-bold uppercase tracking-widest animate-pulse">Check the mail interceptor above</p>
             </div>
             <div className="flex justify-center space-x-2">
               {otp.map((digit, i) => (
@@ -238,31 +339,31 @@ const AuthPage: React.FC = () => {
             <div className="grid grid-cols-2 gap-4">
               <div className="relative col-span-2 md:col-span-1">
                 <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input name="name" placeholder="Full Name" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600" />
+                <input name="name" placeholder="Full Name" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
               </div>
               <div className="relative col-span-2 md:col-span-1">
                 <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input name="phone" placeholder="Phone Number" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600" />
+                <input name="phone" placeholder="Phone Number" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
               </div>
             </div>
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-              <input name="email" type="email" placeholder="Email Address" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600" />
+              <input name="email" type="email" placeholder="Email Address" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
             </div>
             <div className="relative">
               <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-              <input name="password" type="password" placeholder="Secure Password" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600" />
+              <input name="password" type="password" placeholder="Secure Password" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
             </div>
             {role === 'DRIVER' && (
               <div className="space-y-4 pt-4 border-t border-slate-100">
                 <div className="grid grid-cols-2 gap-4">
                   <div className="relative">
                     <Car className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <input name="vehicleModel" placeholder="Vehicle Model" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none" />
+                    <input name="vehicleModel" placeholder="Vehicle Model" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none font-bold" />
                   </div>
                   <div className="relative">
                     <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <input name="plateNumber" placeholder="Plate Number" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none" />
+                    <input name="plateNumber" placeholder="Plate Number" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none font-bold" />
                   </div>
                 </div>
                 
@@ -303,17 +404,17 @@ const AuthPage: React.FC = () => {
             <div className="space-y-4">
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input name="email" type="email" placeholder="Email Address" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600" />
+                <input name="email" type="email" placeholder="Email Address" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
               </div>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input name="password" type="password" placeholder="Password" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600" />
+                <input name="password" type="password" placeholder="Password" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
               </div>
             </div>
             {error && <div className="text-red-600 text-xs font-bold bg-red-50 p-3 rounded-lg text-center">{error}</div>}
             <div className="flex justify-between text-sm font-bold">
                <label className="flex items-center space-x-2 cursor-pointer"><input type="checkbox" className="rounded" /> <span className="text-slate-500">Remember me</span></label>
-               <button type="button" className="text-blue-600">Forgot Password?</button>
+               <button type="button" onClick={() => setView('FORGOT')} className="text-blue-600 hover:underline">Forgot Password?</button>
             </div>
             <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-blue-600 transition shadow-xl" disabled={isLoading}>{isLoading ? "Authenticating..." : "Sign In"}</button>
             <p className="text-center font-bold text-slate-400">New around here? <button type="button" onClick={() => setView('SIGNUP')} className="text-blue-600">Create Account</button></p>
