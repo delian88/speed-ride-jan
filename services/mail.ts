@@ -1,6 +1,4 @@
 
-declare const Email: any;
-
 interface MailOptions {
   email: string;
   name: string;
@@ -13,6 +11,12 @@ const SMTP_CONFIG = {
   Password: "mjbhowjkzmfxqrgd",
   From: "walpconsult@gmail.com"
 };
+
+/**
+ * Helper to safely access the global SmtpJS Email object.
+ * In a module environment, we must access it via the window object.
+ */
+const getSmtp = () => (window as any).Email;
 
 export const sendWelcomeEmail = async ({ email, name, role }: MailOptions) => {
   const isDriver = role === 'DRIVER';
@@ -53,7 +57,12 @@ export const sendWelcomeEmail = async ({ email, name, role }: MailOptions) => {
   `;
 
   try {
-    const response = await Email.send({
+    const smtp = getSmtp();
+    if (!smtp) {
+      console.warn("SpeedRide SMTP | Library not loaded yet.");
+      return false;
+    }
+    const response = await smtp.send({
       ...SMTP_CONFIG,
       To: email,
       Subject: subject,
@@ -88,7 +97,12 @@ export const sendOtpEmail = async (email: string, otp: string) => {
   `;
 
   try {
-    const response = await Email.send({
+    const smtp = getSmtp();
+    if (!smtp) {
+      console.warn("SpeedRide SMTP | Library not loaded yet.");
+      return false;
+    }
+    const response = await smtp.send({
       ...SMTP_CONFIG,
       To: email,
       Subject: `${otp} is your SpeedRide verification code`,
