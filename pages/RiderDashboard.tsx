@@ -23,6 +23,7 @@ const RiderExplore: React.FC = () => {
   const [distance, setDistance] = useState(0);
   const [selectedType, setSelectedType] = useState<VehicleType>(VehicleType.ECONOMY);
   const [pricePerKm, setPricePerKm] = useState(350);
+  const [isApiLoading, setIsApiLoading] = useState(true);
   
   // Real-time tracking states
   const [activeRide, setActiveRide] = useState<RideRequest | null>(null);
@@ -36,41 +37,69 @@ const RiderExplore: React.FC = () => {
   const [driverMarker, setDriverMarker] = useState<any>(null);
 
   useEffect(() => {
-    // Load Price Settings
+    // Load Price Settings from our "Backend"
     db.settings.get().then(s => setPricePerKm(s.pricePerKm));
 
-    // Initialize Map
-    if (mapRef.current && !map) {
-      const gMap = new google.maps.Map(mapRef.current, {
-        center: { lat: 6.5244, lng: 3.3792 }, // Default to Lagos
-        zoom: 14,
-        styles: [
-          { featureType: "all", elementType: "labels.text.fill", stylers: [{ color: "#334155" }] },
-          { featureType: "water", elementType: "geometry", stylers: [{ color: "#e2e8f0" }] },
-          { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#f8fafc" }] },
-          { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
-          { featureType: "poi", stylers: [{ visibility: "off" }] }
-        ],
-        disableDefaultUI: true
-      });
-      
-      const dr = new google.maps.DirectionsRenderer({
-        suppressMarkers: true,
-        polylineOptions: {
-          strokeColor: "#2563eb",
-          strokeWeight: 5,
-          strokeOpacity: 0.7
+    // Initialize Map with a check for the global google object
+    const initMap = () => {
+      if (typeof google !== 'undefined' && mapRef.current && !map) {
+        try {
+          const gMap = new google.maps.Map(mapRef.current, {
+            center: { lat: 6.5244, lng: 3.3792 }, // Default to Lagos
+            zoom: 14,
+            styles: [
+              { featureType: "all", elementType: "labels.text.fill", stylers: [{ color: "#334155" }] },
+              { featureType: "water", elementType: "geometry", stylers: [{ color: "#e2e8f0" }] },
+              { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#f8fafc" }] },
+              { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+              { featureType: "poi", stylers: [{ visibility: "off" }] }
+            ],
+            disableDefaultUI: true
+          });
+          
+          const dr = new google.maps.DirectionsRenderer({
+            suppressMarkers: true,
+            polylineOptions: {
+              strokeColor: "#2563eb",
+              strokeWeight: 5,
+              strokeOpacity: 0.7
+            }
+          });
+          dr.setMap(gMap);
+          
+          setMap(gMap);
+          setDirectionsRenderer(dr);
+          setIsApiLoading(false);
+        } catch (error) {
+          console.error("Error initializing Google Maps:", error);
+          setIsApiLoading(false);
         }
-      });
-      dr.setMap(gMap);
-      
-      setMap(gMap);
-      setDirectionsRenderer(dr);
-    }
+      } else if (typeof google === 'undefined') {
+        // Retry shortly if the script is still loading
+        setTimeout(initMap, 1000);
+      } else {
+        setIsApiLoading(false);
+      }
+    };
+
+    initMap();
   }, [mapRef.current]);
 
   const calculateRoute = () => {
-    if (!pickup || !dropoff || !directionsRenderer) return;
+    if (!pickup || !dropoff) {
+      alert("Please enter both pickup and destination.");
+      return;
+    }
+
+    if (typeof google === 'undefined') {
+      alert("Google Maps API is not loaded. Please ensure a valid API key is in index.html.");
+      return;
+    }
+
+    if (!directionsRenderer) {
+      alert("Map is not ready yet. Please wait a moment.");
+      return;
+    }
 
     const ds = new google.maps.DirectionsService();
     ds.route({
@@ -114,7 +143,7 @@ const RiderExplore: React.FC = () => {
         setPickupMarker(pMarker);
         setDestMarker(dMarker);
       } else {
-        alert("Could not calculate route. Please check the addresses.");
+        alert("Could not calculate route: " + status + ". Please check your addresses.");
       }
     });
   };
@@ -126,7 +155,7 @@ const RiderExplore: React.FC = () => {
       { status: RideStatus.IN_PROGRESS, eta: 12, delay: 8000 }
     ];
 
-    sequence.forEach((step, index) => {
+    sequence.forEach((step) => {
       setTimeout(async () => {
         await db.rides.updateStatus(rideId, step.status);
         setActiveRide(prev => prev ? { ...prev, status: step.status } : null);
@@ -193,7 +222,16 @@ const RiderExplore: React.FC = () => {
   return (
     <div className="h-full relative overflow-hidden bg-slate-50">
       {/* Map Background */}
-      <div ref={mapRef} className="absolute inset-0 z-0" />
+      <div ref={mapRef} className="absolute inset-0 z-0 bg-slate-100 flex items-center justify-center">
+        {isApiLoading && (
+          <div className="text-center z-10 p-8 bg-white/80 backdrop-blur rounded-[40px] shadow-2xl border border-white">
+            <div className="w-16 h-1.5 bg-slate-200 rounded-full overflow-hidden relative mx-auto mb-4">
+               <div className="absolute inset-0 bg-blue-600 animate-loading-bar"></div>
+            </div>
+            <p className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Initializing Neural Map...</p>
+          </div>
+        )}
+      </div>
 
       {/* Prominent Live Status Bar - Only when ride is active */}
       {activeRide && rideStep === 'ON_RIDE' && (
@@ -583,7 +621,7 @@ const RiderProfile: React.FC = () => {
 const RiderDashboard: React.FC = () => {
   const { logout } = useApp();
   const navItems = [
-    { to: '/rider', icon: Navigation, label: 'Hub', end: true },
+    { to: '/rider', icon: Navigation, label: 'Book Ride', end: true },
     { to: '/rider/history', icon: History, label: 'Logs' },
     { to: '/rider/wallet', icon: Wallet, label: 'Wallet' },
     { to: '/rider/profile', icon: UserIcon, label: 'Identity' },
