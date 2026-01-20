@@ -5,10 +5,10 @@ import {
   MapPin, Navigation, History, Wallet, LogOut,
   Car, Zap, Phone, User as UserIcon, CheckCircle, ChevronRight,
   Camera, Save, CreditCard, Plus, ShieldCheck, Mail, Star, X,
-  Search, Locate, Users
+  Search, Locate, Users, Clock, Shield, MoreHorizontal
 } from 'lucide-react';
 import { useApp } from '../App';
-import { RideStatus, VehicleType, User as UserType } from '../types';
+import { RideStatus, VehicleType, User as UserType, RideRequest } from '../types';
 import { db } from '../database';
 import Logo from '../components/Logo';
 
@@ -24,12 +24,16 @@ const RiderExplore: React.FC = () => {
   const [selectedType, setSelectedType] = useState<VehicleType>(VehicleType.ECONOMY);
   const [pricePerKm, setPricePerKm] = useState(350);
   
+  // Real-time tracking states
+  const [activeRide, setActiveRide] = useState<RideRequest | null>(null);
+  const [eta, setEta] = useState<number | null>(null);
+
   const mapRef = useRef<HTMLDivElement>(null);
-  // Fix: Use any type for Google Maps objects to avoid namespace errors (line 25-28)
   const [map, setMap] = useState<any>(null);
   const [directionsRenderer, setDirectionsRenderer] = useState<any>(null);
   const [pickupMarker, setPickupMarker] = useState<any>(null);
   const [destMarker, setDestMarker] = useState<any>(null);
+  const [driverMarker, setDriverMarker] = useState<any>(null);
 
   useEffect(() => {
     // Load Price Settings
@@ -37,25 +41,25 @@ const RiderExplore: React.FC = () => {
 
     // Initialize Map
     if (mapRef.current && !map) {
-      // Fix: Resolve "Cannot find name 'google'" on line 36
       const gMap = new google.maps.Map(mapRef.current, {
         center: { lat: 6.5244, lng: 3.3792 }, // Default to Lagos
-        zoom: 12,
+        zoom: 14,
         styles: [
-          { featureType: "all", elementType: "labels.text.fill", stylers: [{ color: "#000000" }] },
-          { featureType: "water", elementType: "geometry", stylers: [{ color: "#c9c9c9" }] },
-          { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#f5f5f5" }] }
+          { featureType: "all", elementType: "labels.text.fill", stylers: [{ color: "#334155" }] },
+          { featureType: "water", elementType: "geometry", stylers: [{ color: "#e2e8f0" }] },
+          { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#f8fafc" }] },
+          { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+          { featureType: "poi", stylers: [{ visibility: "off" }] }
         ],
         disableDefaultUI: true
       });
       
-      // Fix: Resolve "Cannot find name 'google'" on line 47
       const dr = new google.maps.DirectionsRenderer({
         suppressMarkers: true,
         polylineOptions: {
           strokeColor: "#2563eb",
-          strokeWeight: 6,
-          strokeOpacity: 0.8
+          strokeWeight: 5,
+          strokeOpacity: 0.7
         }
       });
       dr.setMap(gMap);
@@ -68,12 +72,10 @@ const RiderExplore: React.FC = () => {
   const calculateRoute = () => {
     if (!pickup || !dropoff || !directionsRenderer) return;
 
-    // Fix: Resolve "Cannot find name 'google'" on line 65
     const ds = new google.maps.DirectionsService();
     ds.route({
       origin: pickup,
       destination: dropoff,
-      // Fix: Resolve "Cannot find name 'google'" on line 69
       travelMode: google.maps.TravelMode.DRIVING
     }, (result: any, status: any) => {
       if (status === 'OK' && result) {
@@ -82,33 +84,30 @@ const RiderExplore: React.FC = () => {
         setDistance(dist);
         setRideStep('SELECTION');
         
-        // Markers
         if (pickupMarker) pickupMarker.setMap(null);
         if (destMarker) destMarker.setMap(null);
 
-        // Fix: Resolve "Cannot find name 'google'" on line 81
         const pMarker = new google.maps.Marker({
           position: result.routes[0].legs[0].start_location,
           map: map,
           icon: {
-            // Fix: Resolve "Cannot find name 'google'" on line 85
             path: google.maps.SymbolPath.CIRCLE,
             fillColor: '#10b981',
             fillOpacity: 1,
-            strokeWeight: 0,
+            strokeWeight: 4,
+            strokeColor: '#fff',
             scale: 8
           }
         });
-        // Fix: Resolve "Cannot find name 'google'" on line 92
         const dMarker = new google.maps.Marker({
           position: result.routes[0].legs[0].end_location,
           map: map,
           icon: {
-            // Fix: Resolve "Cannot find name 'google'" on line 96
             path: google.maps.SymbolPath.CIRCLE,
             fillColor: '#3b82f6',
             fillOpacity: 1,
-            strokeWeight: 0,
+            strokeWeight: 4,
+            strokeColor: '#fff',
             scale: 8
           }
         });
@@ -120,22 +119,55 @@ const RiderExplore: React.FC = () => {
     });
   };
 
+  const simulateRideUpdates = (rideId: string) => {
+    const sequence = [
+      { status: RideStatus.ACCEPTED, eta: 5, delay: 2000 },
+      { status: RideStatus.ARRIVING, eta: 1, delay: 5000 },
+      { status: RideStatus.IN_PROGRESS, eta: 12, delay: 8000 }
+    ];
+
+    sequence.forEach((step, index) => {
+      setTimeout(async () => {
+        await db.rides.updateStatus(rideId, step.status);
+        setActiveRide(prev => prev ? { ...prev, status: step.status } : null);
+        setEta(step.eta);
+        
+        if (step.status === RideStatus.ARRIVING) {
+          // Simulate driver appearing on map
+          if (map) {
+            const driverLoc = { lat: map.getCenter().lat() + 0.002, lng: map.getCenter().lng() + 0.002 };
+            const dMarker = new google.maps.Marker({
+              position: driverLoc,
+              map: map,
+              label: { text: '🚗', fontSize: '24px' },
+              title: "Tunde's Tesla"
+            });
+            setDriverMarker(dMarker);
+          }
+        }
+      }, step.delay);
+    });
+  };
+
   const confirmRide = async () => {
     if (!currentUser) return;
     setRideStep('MATCHING');
     
     const fare = calculateFare(selectedType);
 
-    await db.rides.create({
+    const newRide = await db.rides.create({
        riderId: currentUser.id,
        pickup,
        dropoff,
        fare: fare,
        distance: distance,
-       vehicleType: selectedType
+       vehicleType: selectedType,
+       status: RideStatus.REQUESTED
     });
 
-    setTimeout(() => setRideStep('ON_RIDE'), 4000);
+    setActiveRide(newRide);
+    setRideStep('ON_RIDE');
+    simulateRideUpdates(newRide.id);
   };
 
   const calculateFare = (type: VehicleType) => {
@@ -145,8 +177,17 @@ const RiderExplore: React.FC = () => {
       [VehicleType.XL]: 1.8,
       [VehicleType.BIKE]: 0.7
     };
-    const base = Math.max(distance * pricePerKm * multipliers[type], 500); // Min fare 500
+    const base = Math.max(distance * pricePerKm * multipliers[type], 500);
     return Math.round(base);
+  };
+
+  const getStatusColor = (status: RideStatus) => {
+    switch (status) {
+      case RideStatus.ACCEPTED: return 'bg-blue-500';
+      case RideStatus.ARRIVING: return 'bg-amber-500';
+      case RideStatus.IN_PROGRESS: return 'bg-emerald-500';
+      default: return 'bg-slate-900';
+    }
   };
 
   return (
@@ -154,8 +195,36 @@ const RiderExplore: React.FC = () => {
       {/* Map Background */}
       <div ref={mapRef} className="absolute inset-0 z-0" />
 
+      {/* Prominent Live Status Bar - Only when ride is active */}
+      {activeRide && rideStep === 'ON_RIDE' && (
+        <div className="absolute top-8 left-1/2 -translate-x-1/2 z-30 w-full max-w-md px-6 animate-slide-top">
+          <div className="bg-slate-900 text-white p-4 rounded-[28px] shadow-2xl flex items-center justify-between border border-white/10 backdrop-blur-xl bg-opacity-95">
+             <div className="flex items-center space-x-4">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${getStatusColor(activeRide.status)} shadow-lg shadow-blue-500/20`}>
+                  {activeRide.status === RideStatus.IN_PROGRESS ? <Navigation className="w-6 h-6 animate-pulse" /> : <Car className="w-6 h-6" />}
+                </div>
+                <div>
+                   <p className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400 mb-0.5">Live Journey Status</p>
+                   <p className="text-lg font-black tracking-tight leading-none">
+                     {activeRide.status === RideStatus.REQUESTED && "Broadcasting..."}
+                     {activeRide.status === RideStatus.ACCEPTED && "Driver Assigned"}
+                     {activeRide.status === RideStatus.ARRIVING && "Driver is Arriving"}
+                     {activeRide.status === RideStatus.IN_PROGRESS && "In Progress"}
+                   </p>
+                </div>
+             </div>
+             {eta !== null && (
+               <div className="text-right pr-2">
+                  <p className="text-[10px] font-black uppercase text-slate-500 mb-0.5">ETA</p>
+                  <p className="text-xl font-black">{eta}m</p>
+               </div>
+             )}
+          </div>
+        </div>
+      )}
+
       {/* Map Overlays & Inputs */}
-      <div className="absolute top-10 left-10 w-96 z-10 space-y-4">
+      <div className={`absolute top-10 left-10 w-96 z-10 space-y-4 transition-all duration-500 ${rideStep === 'ON_RIDE' ? '-translate-x-full opacity-0' : 'translate-x-0 opacity-100'}`}>
         <div className="bg-white p-6 rounded-[32px] shadow-2xl border border-slate-100 animate-fade-up">
            <div className="flex items-center space-x-3 mb-6">
               <Logo className="h-10 w-auto" />
@@ -195,7 +264,7 @@ const RiderExplore: React.FC = () => {
         </div>
       </div>
 
-      {/* Ride Selection Panel */}
+      {/* Ride Selection & Active Trip Info Panel */}
       <div className={`absolute bottom-10 left-10 right-10 max-w-2xl mx-auto z-20 transition-all duration-700 transform ${rideStep !== 'INPUT' ? 'translate-y-0 opacity-100' : 'translate-y-96 opacity-0 pointer-events-none'}`}>
         <div className="bg-white p-10 rounded-[50px] shadow-[0_60px_120px_-30px_rgba(0,0,0,0.3)] border border-white">
           {rideStep === 'MATCHING' ? (
@@ -210,14 +279,54 @@ const RiderExplore: React.FC = () => {
                   <p className="text-slate-400 font-bold mt-1">Found 4 drivers nearby. Negotiating rate...</p>
                </div>
             </div>
-          ) : rideStep === 'ON_RIDE' ? (
-            <div className="text-center py-6 animate-in zoom-in duration-500">
-               <div className="w-20 h-20 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-                  <CheckCircle className="w-10 h-10" />
+          ) : rideStep === 'ON_RIDE' && activeRide ? (
+            <div className="animate-in fade-in zoom-in duration-500">
+               <div className="flex flex-col md:flex-row items-center justify-between gap-8 mb-10">
+                  <div className="flex items-center space-x-6">
+                     <div className="relative">
+                        <img src="https://i.pravatar.cc/150?u=tunde" className="w-20 h-20 rounded-[30px] border-4 border-slate-50 shadow-xl object-cover" alt="Driver" />
+                        <div className="absolute -bottom-2 -right-2 bg-emerald-500 text-white p-1.5 rounded-xl border-4 border-white"><Star className="w-3 h-3 fill-white" /></div>
+                     </div>
+                     <div>
+                        <p className="text-2xl font-black text-slate-900">Tunde Adebayo</p>
+                        <div className="flex items-center space-x-3 mt-1">
+                           <span className="text-xs font-black text-blue-600 bg-blue-50 px-3 py-1 rounded-lg uppercase tracking-widest">Tesla Model 3</span>
+                           <span className="text-xs font-black text-slate-400 border border-slate-100 px-3 py-1 rounded-lg uppercase tracking-widest">LAG-777</span>
+                        </div>
+                     </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                     <button className="p-5 bg-slate-50 text-slate-400 rounded-3xl hover:bg-slate-100 transition shadow-sm"><Phone className="w-6 h-6" /></button>
+                     <button className="p-5 bg-blue-600 text-white rounded-3xl hover:bg-blue-700 transition shadow-xl shadow-blue-500/30"><Shield className="w-6 h-6" /></button>
+                  </div>
                </div>
-               <h3 className="text-3xl font-black text-slate-900 mb-2">Driver Confirmed!</h3>
-               <p className="text-slate-500 font-bold mb-8">Tesla Model S • Plate LAG-007 • Tunde is 3 mins away</p>
-               <button onClick={() => setRideStep('INPUT')} className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black hover:bg-blue-600 transition shadow-2xl">Return to Hub</button>
+
+               <div className="grid grid-cols-3 gap-6 mb-10">
+                  <div className="bg-slate-50 p-5 rounded-[32px] text-center border border-slate-100/50">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Rate</p>
+                     <p className="text-lg font-black text-slate-900">₦{activeRide.fare.toLocaleString()}</p>
+                  </div>
+                  <div className="bg-slate-50 p-5 rounded-[32px] text-center border border-slate-100/50">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Distance</p>
+                     <p className="text-lg font-black text-slate-900">{activeRide.distance.toFixed(1)}km</p>
+                  </div>
+                  <div className="bg-slate-50 p-5 rounded-[32px] text-center border border-slate-100/50">
+                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Rating</p>
+                     <p className="text-lg font-black text-slate-900">4.92</p>
+                  </div>
+               </div>
+
+               <div className="flex space-x-4">
+                  <button onClick={() => {
+                    if (driverMarker) driverMarker.setMap(null);
+                    setRideStep('INPUT');
+                    setActiveRide(null);
+                  }} className="flex-1 py-5 bg-white border-2 border-slate-100 rounded-3xl font-black text-red-500 hover:bg-red-50 transition">Emergency Cancel</button>
+                  <button className="flex-1 py-5 bg-slate-900 text-white rounded-3xl font-black shadow-2xl hover:bg-blue-600 transition flex items-center justify-center space-x-2">
+                    <MoreHorizontal className="w-5 h-5" />
+                    <span>Trip Options</span>
+                  </button>
+               </div>
             </div>
           ) : (
             <div className="space-y-8">
@@ -233,7 +342,6 @@ const RiderExplore: React.FC = () => {
                   {[
                     { type: VehicleType.ECONOMY, name: 'Lite', icon: Car, color: 'text-slate-400' },
                     { type: VehicleType.PREMIUM, name: 'Elite', icon: Zap, color: 'text-blue-600' },
-                    // Fix: Resolved missing icon "Users"
                     { type: VehicleType.XL, name: 'Spaceship', icon: Users, color: 'text-indigo-600' },
                     { type: VehicleType.BIKE, name: 'Rocket', icon: Navigation, color: 'text-orange-500' }
                   ].map((item) => {
