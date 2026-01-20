@@ -41,7 +41,6 @@ const AdminDashboard: React.FC = () => {
 
   return (
     <div className="flex min-h-screen bg-slate-50">
-      {/* Sidebar */}
       <div className="w-72 bg-slate-900 text-slate-400 p-8 flex flex-col shrink-0">
         <div className="flex items-center space-x-3 text-white mb-12">
           <ShieldCheck className="w-10 h-10 text-blue-500" />
@@ -68,8 +67,15 @@ const AdminDashboard: React.FC = () => {
           <button className="flex items-center space-x-4 w-full p-4 rounded-2xl hover:bg-white/5 hover:text-white transition font-bold text-sm"><Settings className="w-5 h-5" /> <span>Global Settings</span></button>
           <button onClick={logout} className="flex items-center space-x-4 w-full p-4 rounded-2xl hover:bg-red-500/10 text-red-400 transition font-bold text-sm"><LogOut className="w-5 h-5" /> <span>Terminate Session</span></button>
         </nav>
-        <div className="mt-auto text-center pt-10 opacity-40">
-           <p className="text-[8px] font-black uppercase tracking-widest">Powered by Premegage Tech</p>
+        <div className="mt-auto text-center pt-10">
+           <a 
+            href="https://www.premegagetech.com" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-[8px] font-black uppercase tracking-widest text-slate-600 hover:text-blue-500 transition"
+           >
+            Powered by Premegage Tech
+           </a>
         </div>
       </div>
 
@@ -86,7 +92,6 @@ const AdminDashboard: React.FC = () => {
         </header>
 
         <main className="p-12 space-y-12">
-          {/* Stats Section */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             {[
               { label: 'Active Sessions', value: stats.activeRides.toLocaleString(), change: '+12%', icon: Car, color: 'blue' },
@@ -96,7 +101,7 @@ const AdminDashboard: React.FC = () => {
             ].map((stat, i) => (
               <div key={i} className="bg-white p-8 rounded-[40px] shadow-sm border border-slate-50 hover:shadow-2xl transition duration-500">
                 <div className="flex justify-between items-start mb-6">
-                  <div className={`p-4 rounded-2xl bg-${stat.color}-50 text-${stat.color}-600`}>
+                  <div className={`p-4 rounded-2xl bg-blue-50 text-blue-600`}>
                     <stat.icon className="w-7 h-7" />
                   </div>
                   {stat.change && <span className="text-xs font-black text-emerald-500 bg-emerald-50 px-3 py-1 rounded-full">{stat.change}</span>}
@@ -107,7 +112,6 @@ const AdminDashboard: React.FC = () => {
             ))}
           </div>
 
-          {/* Verification Workflow */}
           <div className="bg-white rounded-[40px] shadow-sm border border-slate-50 overflow-hidden">
             <div className="p-10 border-b border-slate-50 flex justify-between items-center bg-slate-50/50">
               <div className="flex items-center space-x-4">

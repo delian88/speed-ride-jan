@@ -77,7 +77,6 @@ const AuthPage: React.FC = () => {
       setCorrectOtp(newOtp);
       console.log("SpeedRide Debug | Generated OTP:", newOtp);
       
-      // Attempt to send email in background while we move to the next screen
       sendOtpEmail(formData.email, newOtp).then(success => {
         if (!success) {
           console.warn("SpeedRide Debug | SMTP failed. Using fallback OTP in console.");
@@ -117,7 +116,6 @@ const AuthPage: React.FC = () => {
         } : {})
       });
 
-      // Send Welcome Email
       if (role !== 'ADMIN') {
         sendWelcomeEmail({
           email: formData.email,
@@ -288,7 +286,14 @@ const AuthPage: React.FC = () => {
         </div>
         {renderView()}
         <div className="mt-10 pt-6 border-t border-slate-50 text-center">
-           <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">Powered by Premegage Tech</p>
+           <a 
+            href="https://www.premegagetech.com" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-blue-600 transition"
+           >
+            Powered by Premegage Tech
+           </a>
         </div>
       </div>
     </div>

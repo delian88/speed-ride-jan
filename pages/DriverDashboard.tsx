@@ -145,7 +145,6 @@ const DriverDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 flex overflow-hidden">
-      {/* Sidebar */}
       <div className="w-24 md:w-72 bg-slate-900 text-white flex flex-col p-8 space-y-12 shrink-0">
         <div className="flex items-center space-x-3">
            <div className="bg-blue-600 p-2 rounded-xl"><Zap className="w-8 h-8" /></div>
@@ -165,7 +164,14 @@ const DriverDashboard: React.FC = () => {
           ))}
         </nav>
         <div className="pt-6 border-t border-white/5">
-          <p className="hidden md:block text-[8px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4">Powered by Premegage Tech</p>
+          <a 
+            href="https://www.premegagetech.com" 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="hidden md:block text-[8px] font-black text-slate-500 uppercase tracking-[0.3em] mb-4 hover:text-blue-400 transition"
+          >
+            Powered by Premegage Tech
+          </a>
           <button onClick={logout} className="flex items-center space-x-4 w-full p-4 rounded-2xl text-red-400 hover:bg-red-500/10 transition">
             <LogOut className="w-6 h-6" />
             <span className="hidden md:block font-black text-xs uppercase tracking-widest">Sign Out</span>

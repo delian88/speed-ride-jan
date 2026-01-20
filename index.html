@@ -23,6 +23,12 @@
           50% { transform: translateY(-15px); }
         }
         .animate-float { animation: float 6s ease-in-out infinite; }
+
+        @keyframes drift {
+          0%, 100% { transform: translate(0, 0); }
+          50% { transform: translate(20px, 10px); }
+        }
+        .animate-drift { animation: drift 10s ease-in-out infinite; }
         
         @keyframes shimmer {
           0% { background-position: -200% 0; }
@@ -44,10 +50,28 @@
         .pulse-marker::before { 
           content: ''; display: block; width: 300%; height: 300%; box-sizing: border-box; margin-left: -100%; margin-top: -100%; border-radius: 50%; background-color: #3b82f6; animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; 
         }
+
+        @keyframes radar-beam {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+        .radar-scanner {
+          position: absolute;
+          width: 50%;
+          height: 50%;
+          background: linear-gradient(45deg, rgba(59, 130, 246, 0.4), transparent);
+          transform-origin: bottom right;
+          border-right: 2px solid rgba(59, 130, 246, 0.8);
+          animation: radar-beam 4s linear infinite;
+        }
         
-        .stagger-1 { animation-delay: 0.1s; }
-        .stagger-2 { animation-delay: 0.2s; }
-        .stagger-3 { animation-delay: 0.3s; }
+        .stagger-1 { animation-delay: 0.1s; opacity: 0; }
+        .stagger-2 { animation-delay: 0.2s; opacity: 0; }
+        .stagger-3 { animation-delay: 0.3s; opacity: 0; }
+        .stagger-4 { animation-delay: 0.4s; opacity: 0; }
+        .stagger-5 { animation-delay: 0.5s; opacity: 0; }
+
+        .view-transition { transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
     </style>
 <script type="importmap">
 {
