@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useApp } from '../App';
 import { RideStatus, VehicleType } from '../types';
+import Logo from '../components/Logo';
 
 type RiderView = 'HOME' | 'HISTORY' | 'WALLET' | 'PROFILE';
 
@@ -57,9 +58,9 @@ const RiderDashboard: React.FC = () => {
   return (
     <div className="flex h-screen bg-slate-50 overflow-hidden font-sans">
       <div className="w-24 md:w-80 bg-white border-r border-slate-100 flex flex-col items-center py-12 shrink-0 animate-fade-up">
-        <div className="mb-20">
-          <div className="bg-blue-600 p-2.5 rounded-2xl shadow-xl shadow-blue-100 hover:rotate-12 transition-transform cursor-pointer group">
-            <Zap className="h-8 w-8 text-white fill-current group-hover:scale-110" />
+        <div className="mb-12 px-6 w-full flex justify-center">
+          <div className="bg-white p-2 rounded-2xl shadow-sm hover:scale-105 transition-transform cursor-pointer">
+            <Logo className="h-20 w-auto" />
           </div>
         </div>
         <nav className="flex-1 flex flex-col space-y-6 w-full px-6">
@@ -79,7 +80,7 @@ const RiderDashboard: React.FC = () => {
             </button>
           ))}
         </nav>
-        <div className="mt-auto px-6 w-full text-center">
+        <div className="mt-auto px-6 w-full text-center pb-6">
            <a 
             href="https://www.premegagetech.com" 
             target="_blank" 
@@ -117,8 +118,8 @@ const RiderDashboard: React.FC = () => {
                      <div className="absolute inset-0 rounded-full overflow-hidden opacity-40">
                         <div className="radar-scanner"></div>
                      </div>
-                     <div className="relative w-32 h-32 bg-slate-900 rounded-[40px] flex items-center justify-center shadow-2xl z-10 animate-bounce group">
-                        <Car className="text-blue-400 w-16 h-16 animate-pulse group-hover:scale-110 transition-transform" />
+                     <div className="relative w-32 h-32 bg-slate-900 rounded-[40px] flex items-center justify-center shadow-2xl z-10 animate-bounce group overflow-hidden">
+                        <Logo className="h-20 w-auto brightness-0 invert" />
                      </div>
                   </div>
                   <div className="text-center space-y-4">

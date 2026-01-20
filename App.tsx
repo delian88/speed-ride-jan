@@ -3,6 +3,7 @@ import React, { useState, useEffect, createContext, useContext } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { db } from './database';
 import { User, Driver, UserRole } from './types';
+import Logo from './components/Logo';
 
 // Pages
 import LandingPage from './pages/LandingPage';
@@ -39,7 +40,8 @@ const App: React.FC = () => {
       setCurrentUser(user);
       setIsAuthenticated(true);
     }
-    setIsInitializing(false);
+    // Simulate a bit of loading for branding impact
+    setTimeout(() => setIsInitializing(false), 2000);
   }, []);
 
   const login = (user: User | Driver) => {
@@ -65,8 +67,15 @@ const App: React.FC = () => {
   };
 
   if (isInitializing) return (
-    <div className="h-screen w-screen flex items-center justify-center bg-white">
-      <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-blue-600"></div>
+    <div className="h-screen w-screen flex flex-col items-center justify-center bg-white animate-in fade-in duration-700">
+      <div className="relative mb-8">
+        <Logo className="h-48 w-auto logo-ignition" />
+        <div className="absolute -inset-4 bg-orange-500/10 rounded-full blur-2xl animate-pulse -z-10"></div>
+      </div>
+      <div className="w-48 h-1.5 bg-slate-100 rounded-full overflow-hidden relative">
+        <div className="absolute inset-0 bg-blue-600 animate-loading-bar"></div>
+      </div>
+      <p className="mt-6 text-[10px] font-black uppercase tracking-[0.4em] text-slate-300">Igniting Core Fusion...</p>
     </div>
   );
 

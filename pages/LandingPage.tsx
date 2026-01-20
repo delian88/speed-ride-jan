@@ -9,6 +9,7 @@ import {
   Globe, ShieldAlert, Cpu, BarChart3, TrendingUp,
   User as UserIcon
 } from 'lucide-react';
+import Logo from '../components/Logo';
 
 const LandingPage: React.FC = () => {
   return (
@@ -17,12 +18,9 @@ const LandingPage: React.FC = () => {
       <nav className="fixed w-full z-50 glass border-b border-gray-100 transition-all duration-500">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
-            <div className="flex items-center group cursor-pointer">
-              <div className="bg-blue-600 p-1.5 rounded-lg mr-2 group-hover:rotate-12 transition-transform">
-                <Zap className="h-6 w-6 text-white fill-current" />
-              </div>
-              <span className="text-2xl font-black tracking-tighter text-slate-900">SPEEDRIDE</span>
-            </div>
+            <Link to="/" className="flex items-center group cursor-pointer h-full py-2">
+              <Logo className="h-16 w-auto group-hover:scale-105 transition-transform" />
+            </Link>
             <div className="hidden lg:flex space-x-10 font-bold text-slate-600">
               <a href="#services" className="hover:text-blue-600 transition-colors">Fleet</a>
               <a href="#safety" className="hover:text-blue-600 transition-colors">Safety</a>
@@ -75,7 +73,9 @@ const LandingPage: React.FC = () => {
               alt="Premium Ride" 
              />
              <div className="absolute top-20 -left-12 bg-white p-6 rounded-3xl shadow-2xl border border-slate-50 animate-float stagger-2">
-                <div className="bg-blue-600 p-3 rounded-2xl mb-2 inline-block"><Cpu className="text-white w-6 h-6" /></div>
+                <div className="mb-2 inline-block">
+                  <Logo className="h-10 w-auto" />
+                </div>
                 <p className="font-black text-slate-900">AI Routing v4.0</p>
                 <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Optimizing every path</p>
              </div>
@@ -121,7 +121,7 @@ const LandingPage: React.FC = () => {
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-20 items-center">
           <div className="relative">
             <img src="https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?auto=format&fit=crop&w=800&q=80" className="rounded-[60px] shadow-2xl animate-float" />
-            <div className="absolute bottom-10 -right-10 bg-blue-600 p-10 rounded-[40px] shadow-2xl">
+            <div className="absolute bottom-10 -right-10 bg-blue-600 p-10 rounded-[40px] shadow-2xl flex items-center justify-center">
               <ShieldCheck className="w-16 h-16 text-white" />
             </div>
           </div>
@@ -131,7 +131,6 @@ const LandingPage: React.FC = () => {
             <div className="space-y-8">
               {[
                 { title: 'AI Sentry Monitoring', desc: 'Our cloud platform monitors every route 24/7, flagging anomalies in real-time.', icon: ShieldAlert },
-                // Fix: Corrected 'UserIcon' not found error by importing 'User as UserIcon' from lucide-react
                 { title: 'Verified Professional DNA', desc: 'Drivers undergo bi-annual background & biometric clearance.', icon: UserIcon },
                 { title: 'One-Tap Rapid Response', desc: 'Direct link to local security and medical units in under 2 minutes.', icon: Phone }
               ].map((s, idx) => (
@@ -197,10 +196,7 @@ const LandingPage: React.FC = () => {
           <div className="grid md:grid-cols-12 gap-16 mb-24">
             <div className="md:col-span-5 space-y-10">
               <div className="flex items-center">
-                <div className="bg-blue-600 p-2 rounded-xl mr-3 shadow-lg">
-                  <Zap className="h-6 w-6 text-white fill-current" />
-                </div>
-                <span className="text-3xl font-black tracking-tighter text-slate-900">SPEEDRIDE</span>
+                <Logo className="h-20 w-auto" />
               </div>
               <p className="text-slate-500 font-bold text-lg max-w-sm leading-relaxed">Redefining mobility with cutting-edge tech and elite service. Experience the city like never before.</p>
               <div className="flex space-x-4">
@@ -238,7 +234,7 @@ const LandingPage: React.FC = () => {
           
           <div className="pt-12 border-t border-slate-50 flex flex-col md:flex-row justify-between items-center gap-6">
             <p className="text-slate-400 text-xs font-bold">© 2026 SpeedRide Mobility Inc. All rights reserved.</p>
-            <div className="group cursor-pointer">
+            <div className="group cursor-pointer text-right">
               <a 
                 href="https://www.premegagetech.com" 
                 target="_blank" 

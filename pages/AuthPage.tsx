@@ -9,6 +9,7 @@ import {
   ChevronRight, Zap, ChevronLeft,
   FileText, Car, Smartphone, AlertCircle
 } from 'lucide-react';
+import Logo from '../components/Logo';
 
 type AuthView = 'LOGIN' | 'SIGNUP' | 'OTP' | 'FORGOT' | 'RESET' | 'SUCCESS';
 
@@ -154,7 +155,7 @@ const AuthPage: React.FC = () => {
         return (
           <div className="text-center py-10 space-y-6 animate-in zoom-in duration-500">
             <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto shadow-lg">
-              <Zap className="w-10 h-10 fill-current" />
+              <Logo className="h-12 w-auto" />
             </div>
             <h2 className="text-3xl font-black text-slate-900">Verified!</h2>
             <p className="text-slate-500 font-bold">Account created successfully. A welcome email has been dispatched to your inbox.</p>
@@ -280,9 +281,8 @@ const AuthPage: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6 relative overflow-hidden">
       <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-100/50 rounded-full blur-[120px] -z-10"></div>
       <div className="max-w-md w-full bg-white rounded-[40px] shadow-2xl border border-white p-10">
-        <div className="flex justify-center items-center mb-10">
-          <div className="bg-blue-600 p-2 rounded-xl mr-2"><Zap className="h-6 w-6 text-white fill-current" /></div>
-          <span className="text-2xl font-black tracking-tighter">SPEEDRIDE</span>
+        <div className="flex flex-col items-center justify-center mb-10">
+          <Logo className="h-24 w-auto mb-2" />
         </div>
         {renderView()}
         <div className="mt-10 pt-6 border-t border-slate-50 text-center">

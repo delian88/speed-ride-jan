@@ -64,6 +64,20 @@
           border-right: 2px solid rgba(59, 130, 246, 0.8);
           animation: radar-beam 4s linear infinite;
         }
+
+        @keyframes ignition {
+          0% { transform: scale(1); filter: brightness(1); }
+          50% { transform: scale(1.05); filter: brightness(1.2) drop-shadow(0 0 15px rgba(249, 115, 22, 0.4)); }
+          100% { transform: scale(1); filter: brightness(1); }
+        }
+        .logo-ignition { animation: ignition 2s ease-in-out infinite; }
+
+        @keyframes loading-bar {
+          0% { transform: translateX(-100%); }
+          50% { transform: translateX(0); }
+          100% { transform: translateX(100%); }
+        }
+        .animate-loading-bar { animation: loading-bar 1.5s cubic-bezier(0.65, 0.05, 0.36, 1) infinite; }
         
         .stagger-1 { animation-delay: 0.1s; opacity: 0; }
         .stagger-2 { animation-delay: 0.2s; opacity: 0; }
@@ -72,6 +86,8 @@
         .stagger-5 { animation-delay: 0.5s; opacity: 0; }
 
         .view-transition { transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+
+        .logo-transparent { mix-blend-mode: multiply; }
     </style>
 <script type="importmap">
 {
