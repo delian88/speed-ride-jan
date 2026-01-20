@@ -34,29 +34,39 @@ const App: React.FC = () => {
   const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
+    console.log("App initializing...");
     const savedUser = localStorage.getItem('speedride_session');
     if (savedUser && savedUser !== 'undefined') {
       try {
         const user = JSON.parse(savedUser);
-        setCurrentUser(user);
-        setIsAuthenticated(true);
+        if (user && user.id) {
+          console.log("Session recovered for:", user.name);
+          setCurrentUser(user);
+          setIsAuthenticated(true);
+        }
       } catch (err) {
-        console.error("Failed to parse session:", err);
+        console.error("Session parse failed:", err);
         localStorage.removeItem('speedride_session');
       }
     }
-    // Simulate a bit of loading for branding impact
-    const timer = setTimeout(() => setIsInitializing(false), 2000);
+    
+    // Branding impact + session warming
+    const timer = setTimeout(() => {
+      console.log("Core fusion ignited.");
+      setIsInitializing(false);
+    }, 1500);
     return () => clearTimeout(timer);
   }, []);
 
   const login = (user: User | Driver) => {
+    console.log("Logging in user:", user.email);
     setCurrentUser(user);
     setIsAuthenticated(true);
     localStorage.setItem('speedride_session', JSON.stringify(user));
   };
 
   const logout = () => {
+    console.log("Logging out.");
     setCurrentUser(null);
     setIsAuthenticated(false);
     localStorage.removeItem('speedride_session');
@@ -81,7 +91,7 @@ const App: React.FC = () => {
       <div className="w-48 h-1.5 bg-slate-100 rounded-full overflow-hidden relative">
         <div className="absolute inset-0 bg-blue-600 animate-loading-bar"></div>
       </div>
-      <p className="mt-6 text-[10px] font-black uppercase tracking-[0.4em] text-slate-300">Igniting Core Fusion...</p>
+      <p className="mt-6 text-[10px] font-black uppercase tracking-[0.4em] text-slate-300">Warming Engine Core...</p>
     </div>
   );
 

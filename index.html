@@ -7,7 +7,7 @@
     <title>SpeedRide | 2026 Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://smtpjs.com/v3/smtp.js"></script>
-    <!-- Add Google Maps API - async/defer to prevent blank screen if script fails to load -->
+    <!-- Google Maps API with fallback handling -->
     <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
@@ -32,10 +32,13 @@
         }
         .animate-drift { animation: drift 10s ease-in-out infinite; }
         
-        @keyframes shimmer {
-          0% { background-position: -200% 0; }
-          100% { background-position: 200% 0; }
+        @keyframes loading-bar {
+          0% { transform: translateX(-100%); }
+          50% { transform: translateX(0); }
+          100% { transform: translateX(100%); }
         }
+        .animate-loading-bar { animation: loading-bar 1.5s cubic-bezier(0.65, 0.05, 0.36, 1) infinite; }
+
         .shimmer-text {
           background: linear-gradient(90deg, #1e293b 0%, #3b82f6 50%, #1e293b 100%);
           background-size: 200% auto;
@@ -44,69 +47,36 @@
           background-clip: text;
           animation: shimmer 4s linear infinite;
         }
+        @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
 
-        @keyframes pulse-ring { 
-          0% { transform: scale(0.33); opacity: 1; } 
-          80%, 100% { opacity: 0; transform: scale(3); } 
-        }
-        .pulse-marker::before { 
-          content: ''; display: block; width: 300%; height: 300%; box-sizing: border-box; margin-left: -100%; margin-top: -100%; border-radius: 50%; background-color: #3b82f6; animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite; 
-        }
-
-        @keyframes radar-beam {
-          0% { transform: rotate(0deg); }
-          100% { transform: rotate(360deg); }
-        }
+        @keyframes radar-beam { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         .radar-scanner {
-          position: absolute;
-          width: 50%;
-          height: 50%;
+          position: absolute; width: 50%; height: 50%;
           background: linear-gradient(45deg, rgba(59, 130, 246, 0.4), transparent);
-          transform-origin: bottom right;
-          border-right: 2px solid rgba(59, 130, 246, 0.8);
+          transform-origin: bottom right; border-right: 2px solid rgba(59, 130, 246, 0.8);
           animation: radar-beam 4s linear infinite;
         }
 
-        @keyframes ignition {
-          0% { transform: scale(1); filter: brightness(1); }
-          50% { transform: scale(1.05); filter: brightness(1.2) drop-shadow(0 0 15px rgba(249, 115, 22, 0.4)); }
-          100% { transform: scale(1); filter: brightness(1); }
-        }
         .logo-ignition { animation: ignition 2s ease-in-out infinite; }
-
-        @keyframes loading-bar {
-          0% { transform: translateX(-100%); }
-          50% { transform: translateX(0); }
-          100% { transform: translateX(100%); }
+        @keyframes ignition {
+          0%, 100% { transform: scale(1); filter: brightness(1); }
+          50% { transform: scale(1.05); filter: brightness(1.2); }
         }
-        .animate-loading-bar { animation: loading-bar 1.5s cubic-bezier(0.65, 0.05, 0.36, 1) infinite; }
-        
-        .stagger-1 { animation-delay: 0.1s; opacity: 0; }
-        .stagger-2 { animation-delay: 0.2s; opacity: 0; }
-        .stagger-3 { animation-delay: 0.3s; opacity: 0; }
-        .stagger-4 { animation-delay: 0.4s; opacity: 0; }
-        .stagger-5 { animation-delay: 0.5s; opacity: 0; }
 
-        .view-transition { transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
-
-        .logo-transparent { mix-blend-mode: multiply; }
-
-        @keyframes slide-in-top {
-          from { transform: translateY(-100%); opacity: 0; }
-          to { transform: translateY(0); opacity: 1; }
-        }
-        .animate-slide-top { animation: slide-in-top 0.5s cubic-bezier(0.16, 1, 0.3, 1); }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 10px; }
     </style>
 <script type="importmap">
 {
   "imports": {
-    "recharts": "https://esm.sh/recharts@2.12.7?external=react,react-dom",
-    "lucide-react": "https://esm.sh/lucide-react@0.428.0?external=react",
-    "react/": "https://esm.sh/react@19.0.0/",
     "react": "https://esm.sh/react@19.0.0",
-    "react-dom/": "https://esm.sh/react-dom@19.0.0/",
+    "react/": "https://esm.sh/react@19.0.0/",
     "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "react-router-dom": "https://esm.sh/react-router-dom@6.26.0?external=react,react-dom"
+    "react-dom/": "https://esm.sh/react-dom@19.0.0/",
+    "react-router-dom": "https://esm.sh/react-router-dom@6.26.0?external=react,react-dom",
+    "recharts": "https://esm.sh/recharts@2.12.7?external=react,react-dom",
+    "lucide-react": "https://esm.sh/lucide-react@0.428.0?external=react,react-dom"
   }
 }
 </script>

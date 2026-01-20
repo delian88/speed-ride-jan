@@ -9,11 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "recharts": "2.12.7",
-    "lucide-react": "0.428.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
-    "react-router-dom": "6.26.0"
+    "react-router-dom": "6.26.0",
+    "recharts": "2.12.7",
+    "lucide-react": "0.428.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
