@@ -82,11 +82,19 @@ const AuthPage: React.FC = () => {
     setError('');
     try {
       const user = await db.users.getByEmail(formData.email);
-      if (user && (user as any).password === formData.password && user.role === role) {
-        login(user);
-        navigate(`/${role.toLowerCase()}`);
+      if (user) {
+         if ((user as any).password === formData.password) {
+            if (user.role === role) {
+               login(user);
+               navigate(`/${role.toLowerCase()}`);
+            } else {
+               setError(`Email found, but role mismatch. Please select the ${user.role} tab.`);
+            }
+         } else {
+            setError("Incorrect password.");
+         }
       } else {
-        setError("Invalid credentials or role mismatch.");
+        setError("Account not found. Please check the email address.");
       }
     } catch (err) {
       setError("An error occurred during authentication.");
@@ -412,7 +420,10 @@ const AuthPage: React.FC = () => {
                 <input name="password" type="password" placeholder="Password" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
               </div>
             </div>
-            {error && <div className="text-red-600 text-xs font-bold bg-red-50 p-3 rounded-lg text-center">{error}</div>}
+            {error && <div className="text-red-600 text-xs font-bold bg-red-50 p-4 rounded-xl text-center border border-red-100 flex items-center justify-center space-x-2 animate-in slide-in-from-top-2">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
+            </div>}
             <div className="flex justify-between text-sm font-bold">
                <label className="flex items-center space-x-2 cursor-pointer"><input type="checkbox" className="rounded" /> <span className="text-slate-500">Remember me</span></label>
                <button type="button" onClick={() => setView('FORGOT')} className="text-blue-600 hover:underline">Forgot Password?</button>
