@@ -27,18 +27,37 @@ class MockDatabase {
 
   // Settings
   settings = {
-    get: async (): Promise<{ pricePerKm: number }> => {
+    get: async (): Promise<{ 
+      pricePerKm: number, 
+      baseFare: number, 
+      commission: number, 
+      maintenanceMode: boolean,
+      globalAlert: string 
+    }> => {
       await this.delay(100);
       try {
         const data = localStorage.getItem(this.prefix + 'settings');
-        return data ? JSON.parse(data) : { pricePerKm: 2000 };
+        return data ? JSON.parse(data) : { 
+          pricePerKm: 2000, 
+          baseFare: 1000, 
+          commission: 20, 
+          maintenanceMode: false,
+          globalAlert: '' 
+        };
       } catch {
-        return { pricePerKm: 2000 };
+        return { 
+          pricePerKm: 2000, 
+          baseFare: 1000, 
+          commission: 20, 
+          maintenanceMode: false,
+          globalAlert: '' 
+        };
       }
     },
-    update: async (updates: { pricePerKm: number }): Promise<void> => {
+    update: async (updates: any): Promise<void> => {
       await this.delay(200);
-      this.set('settings', updates);
+      const current = await this.settings.get();
+      this.set('settings', { ...current, ...updates });
     }
   };
 
@@ -63,6 +82,7 @@ class MockDatabase {
         id: 'u_' + Math.random().toString(36).substr(2, 9),
         rating: 5.0,
         balance: 2500, // Starting bonus
+        createdAt: new Date().toISOString(),
         ...userData
       } as any;
       users.push(newUser);
@@ -77,6 +97,12 @@ class MockDatabase {
       users[idx] = { ...users[idx], ...updates };
       this.set('users', users);
       return users[idx];
+    },
+    delete: async (id: string): Promise<void> => {
+      await this.delay();
+      const users = this.get('users');
+      const filtered = users.filter(u => u.id !== id);
+      this.set('users', filtered);
     },
     updatePassword: async (email: string, newPassword: string): Promise<boolean> => {
       await this.delay();
@@ -140,7 +166,8 @@ class MockDatabase {
           role: 'RIDER',
           avatar: 'https://i.pravatar.cc/150?u=rider',
           rating: 4.8,
-          balance: 25000
+          balance: 25000,
+          createdAt: new Date().toISOString()
         },
         {
           id: 'd1',
@@ -156,7 +183,8 @@ class MockDatabase {
           vehicleModel: 'Tesla Model 3 (2026)',
           plateNumber: 'LAG-777-2026',
           isOnline: true,
-          isVerified: true
+          isVerified: true,
+          createdAt: new Date().toISOString()
         },
         {
           id: 'a1',
@@ -167,14 +195,21 @@ class MockDatabase {
           role: 'ADMIN',
           avatar: 'https://i.pravatar.cc/150?u=admin',
           rating: 5.0,
-          balance: 0
+          balance: 0,
+          createdAt: new Date().toISOString()
         }
       ];
       this.set('users', seedUsers);
     }
     
     if (!localStorage.getItem(this.prefix + 'settings')) {
-      this.set('settings', { pricePerKm: 2000 });
+      this.set('settings', { 
+        pricePerKm: 2000, 
+        baseFare: 1000, 
+        commission: 20, 
+        maintenanceMode: false,
+        globalAlert: '' 
+      });
     }
   }
 }
