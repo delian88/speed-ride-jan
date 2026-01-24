@@ -262,7 +262,7 @@ const AuthPage: React.FC = () => {
             <p className="text-slate-500 font-medium text-center text-sm px-4">Enter your email and we'll transmit a secure recovery code to your inbox.</p>
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-              <input name="email" type="email" placeholder="Email Address" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
+              <input name="email" type="text" placeholder="Email Address" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
             </div>
             {error && <div className="text-red-600 text-xs font-bold bg-red-50 p-3 rounded-lg text-center">{error}</div>}
             <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-blue-600 transition shadow-xl" disabled={isLoading}>{isLoading ? "Processing Request..." : "Send Recovery Code"}</button>
@@ -332,6 +332,7 @@ const AuthPage: React.FC = () => {
           <form onSubmit={handleSignup} className="space-y-4 animate-in fade-in duration-500">
             <h2 className="text-2xl font-black text-slate-900 text-center mb-6">Create Account</h2>
             <div className="flex bg-slate-100 p-1 rounded-xl mb-4">
+              {/* Removed ADMIN from signup selection */}
               {['RIDER', 'DRIVER'].map(r => (
                 <button key={r} type="button" onClick={() => setRole(r as any)} className={`flex-1 py-2 text-xs font-black rounded-lg transition ${role === r ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>{r}</button>
               ))}
@@ -404,7 +405,7 @@ const AuthPage: React.FC = () => {
             <div className="space-y-4">
               <div className="relative">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input name="email" type="email" placeholder="Email Address" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
+                <input name="email" type="text" placeholder="Email or Username" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
               </div>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />

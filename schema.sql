@@ -52,7 +52,7 @@ CREATE TABLE transactions (
 -- Initial Admin Seed
 -- Password hash would be hashed in production (e.g., bcrypt)
 INSERT INTO users (id, name, email, phone, password_hash, role, is_verified) 
-VALUES ('admin_01', 'SpeedAdmin', 'admin@speedride.com', '08000000000', 'password123', 'ADMIN', TRUE);
+VALUES ('admin_01', 'SpeedAdmin', 'admin', '08000000000', 'admin123', 'ADMIN', TRUE);
 
 -- Create Indexes for performance
 CREATE INDEX idx_user_email ON users(email);

@@ -189,11 +189,23 @@ class MockDatabase {
         {
           id: 'a1',
           name: 'Super Admin',
-          email: 'admin@speedride.com',
-          password: 'password123',
+          email: 'admin',
+          password: 'admin123',
           phone: '+234 803 000 0000',
           role: 'ADMIN',
           avatar: 'https://i.pravatar.cc/150?u=admin',
+          rating: 5.0,
+          balance: 0,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'a2',
+          name: 'Khalid',
+          email: 'khalid@gmail.com',
+          password: 'khalid123',
+          phone: '+234 810 555 1234',
+          role: 'ADMIN',
+          avatar: 'https://i.pravatar.cc/150?u=khalid',
           rating: 5.0,
           balance: 0,
           createdAt: new Date().toISOString()

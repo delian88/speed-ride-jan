@@ -16,7 +16,7 @@ const MOCK_USER: User = {
 const MOCK_DRIVER: Driver = {
   id: 'd1',
   name: 'Sarah Miller',
-  email: 'sarah@speedride.com',
+  email: 'driver@speedride.com',
   phone: '+1 987 654 321',
   role: 'DRIVER',
   avatar: 'https://picsum.photos/seed/sarah/200',
@@ -31,8 +31,8 @@ const MOCK_DRIVER: Driver = {
 
 const MOCK_ADMIN: User = {
   id: 'a1',
-  name: 'Admin Boss',
-  email: 'admin@speedride.com',
+  name: 'Super Admin',
+  email: 'admin',
   phone: '+1 111 222 333',
   role: 'ADMIN',
   avatar: 'https://picsum.photos/seed/admin/200',
