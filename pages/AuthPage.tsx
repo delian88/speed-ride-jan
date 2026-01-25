@@ -88,7 +88,11 @@ const AuthPage: React.FC = () => {
          if ((user as any).password === cleanPassword) {
             if (user.role === role) {
                login(user);
-               navigate(`/${role.toLowerCase()}`);
+               // Wait for toast to be seen before redirecting
+               setTimeout(() => {
+                 navigate(`/${role.toLowerCase()}`);
+               }, 1200);
+               return; // Exit early to keep loading state until navigation
             } else {
                const msg = `Role mismatch. This account is registered as ${user.role}.`;
                setError(msg);
@@ -226,7 +230,10 @@ const AuthPage: React.FC = () => {
       setView('SUCCESS');
       setTimeout(() => {
         login(newUser as any);
-        navigate(`/${role.toLowerCase()}`);
+        // Delay navigation to let the "Neural Link Established" toast show
+        setTimeout(() => {
+          navigate(`/${role.toLowerCase()}`);
+        }, 1200);
       }, 2000);
     } catch (err) {
       showToast("Database commit failed", "error");
