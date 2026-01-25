@@ -73,7 +73,8 @@ class MockDatabase {
     },
     getByEmail: async (email: string): Promise<User | undefined> => {
       await this.delay();
-      return this.get('users').find(u => u.email.toLowerCase() === email.toLowerCase());
+      const searchEmail = email.trim().toLowerCase();
+      return this.get('users').find(u => u.email.toLowerCase() === searchEmail);
     },
     create: async (userData: Partial<User | Driver>): Promise<User | Driver> => {
       await this.delay();
@@ -156,44 +157,15 @@ class MockDatabase {
   init() {
     let users = this.get('users');
     
-    // Core Seed Data
-    const seedUsers = [
-      {
-        id: 'u1',
-        name: 'Demo Rider',
-        email: 'rider@speedride.com',
-        password: 'password123',
-        phone: '+234 801 234 5678',
-        role: 'RIDER',
-        avatar: 'https://i.pravatar.cc/150?u=rider',
-        rating: 4.8,
-        balance: 25000,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'd1',
-        name: 'Adebayo Tunde',
-        email: 'driver@speedride.com',
-        password: 'password123',
-        phone: '+234 802 345 6789',
-        role: 'DRIVER',
-        avatar: 'https://i.pravatar.cc/150?u=driver',
-        rating: 4.9,
-        balance: 150000,
-        vehicleType: VehicleType.PREMIUM,
-        vehicleModel: 'Tesla Model 3 (2026)',
-        plateNumber: 'LAG-777-2026',
-        isOnline: true,
-        isVerified: true,
-        createdAt: new Date().toISOString()
-      },
+    // Hardcoded Master Admin Identities
+    const masterAdmins = [
       {
         id: 'a1',
         name: 'Super Admin',
         email: 'admin',
         password: 'admin123',
         phone: '+234 803 000 0000',
-        role: 'ADMIN',
+        role: 'ADMIN' as UserRole,
         avatar: 'https://i.pravatar.cc/150?u=admin',
         rating: 5.0,
         balance: 0,
@@ -205,7 +177,7 @@ class MockDatabase {
         email: 'khalid@gmail.com',
         password: 'khalid123',
         phone: '+234 810 555 1234',
-        role: 'ADMIN',
+        role: 'ADMIN' as UserRole,
         avatar: 'https://i.pravatar.cc/150?u=khalid',
         rating: 5.0,
         balance: 0,
@@ -213,16 +185,53 @@ class MockDatabase {
       }
     ];
 
-    // If database is completely empty, set full seed
-    if (users.length === 0) {
-      this.set('users', seedUsers);
-    } else {
-      // Force sync: Ensure Khalid exists even if user has a pre-existing local database
-      const hasKhalid = users.some(u => u.email.toLowerCase() === 'khalid@gmail.com');
-      if (!hasKhalid) {
-        users.push(seedUsers[3]); // Push Khalid
-        this.set('users', users);
+    // Other Seed Data
+    const seedExtras = [
+      {
+        id: 'u1',
+        name: 'Demo Rider',
+        email: 'rider@speedride.com',
+        password: 'password123',
+        phone: '+234 801 234 5678',
+        role: 'RIDER' as UserRole,
+        avatar: 'https://i.pravatar.cc/150?u=rider',
+        rating: 4.8,
+        balance: 25000,
+        createdAt: new Date().toISOString()
+      },
+      {
+        id: 'd1',
+        name: 'Adebayo Tunde',
+        email: 'driver@speedride.com',
+        password: 'password123',
+        phone: '+234 802 345 6789',
+        role: 'DRIVER' as UserRole,
+        avatar: 'https://i.pravatar.cc/150?u=driver',
+        rating: 4.9,
+        balance: 150000,
+        vehicleType: VehicleType.PREMIUM,
+        vehicleModel: 'Tesla Model 3 (2026)',
+        plateNumber: 'LAG-777-2026',
+        isOnline: true,
+        isVerified: true,
+        createdAt: new Date().toISOString()
       }
+    ];
+
+    if (users.length === 0) {
+      this.set('users', [...masterAdmins, ...seedExtras]);
+    } else {
+      // MASTER ADMIN SYNC: Ensure these accounts always match requested credentials
+      masterAdmins.forEach(master => {
+        const idx = users.findIndex(u => u.email.toLowerCase() === master.email.toLowerCase());
+        if (idx === -1) {
+          users.push(master);
+        } else {
+          // Force overwrite with correct role and password
+          users[idx] = { ...users[idx], ...master };
+        }
+      });
+      this.set('users', users);
     }
     
     if (!localStorage.getItem(this.prefix + 'settings')) {
@@ -234,6 +243,8 @@ class MockDatabase {
         globalAlert: '' 
       });
     }
+    
+    console.log("SpeedRide 2026 Database: Neural Node Link Active.");
   }
 }
 

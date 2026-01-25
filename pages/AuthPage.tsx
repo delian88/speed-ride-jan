@@ -80,10 +80,15 @@ const AuthPage: React.FC = () => {
     e.preventDefault();
     setIsLoading(true);
     setError('');
+    
+    // Sanitization
+    const trimmedEmail = formData.email.trim();
+    const cleanPassword = formData.password.trim();
+
     try {
-      const user = await db.users.getByEmail(formData.email);
+      const user = await db.users.getByEmail(trimmedEmail);
       if (user) {
-         if ((user as any).password === formData.password) {
+         if ((user as any).password === cleanPassword) {
             if (user.role === role) {
                login(user);
                navigate(`/${role.toLowerCase()}`);
