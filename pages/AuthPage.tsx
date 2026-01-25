@@ -80,25 +80,15 @@ const AuthPage: React.FC = () => {
     setError('');
     
     try {
-      // Direct call to real auth endpoint
-      const response = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: formData.email.trim(),
-          password: formData.password.trim(),
-          role: role
-        })
-      });
+      const email = formData.email.trim();
+      const password = formData.password.trim();
 
-      if (!response.ok) {
-        const err = await response.json().catch(() => ({ message: 'Neural Link Refused' }));
-        throw new Error(err.message || 'Access Denied');
-      }
-
-      const session = await response.json();
+      // Use the new simulated auth login
+      const session = await db.auth.login(email, password, role);
+      
       login(session);
       
+      // Delay navigation to ensure toast visibility
       setTimeout(() => {
         navigate(`/${role.toLowerCase()}`);
       }, 1200);
@@ -120,7 +110,6 @@ const AuthPage: React.FC = () => {
     setIsLoading(true);
     setError('');
     try {
-      // In production, we first verify the email via OTP
       const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
       setCorrectOtp(newOtp);
       await sendOtpEmail(formData.email, newOtp);
