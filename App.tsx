@@ -22,9 +22,9 @@ interface Toast {
 }
 
 interface AppContextType {
-  currentUser: User | Driver | null;
+  currentUser: (User & { token?: string }) | (Driver & { token?: string }) | null;
   isAuthenticated: boolean;
-  login: (user: User | Driver) => void;
+  login: (user: any) => void;
   logout: () => void;
   refreshUser: () => Promise<void>;
   showToast: (message: string, type?: ToastType) => void;
@@ -39,7 +39,7 @@ export const useApp = () => {
 };
 
 const App: React.FC = () => {
-  const [currentUser, setCurrentUser] = useState<User | Driver | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -49,7 +49,7 @@ const App: React.FC = () => {
     if (savedUser && savedUser !== 'undefined') {
       try {
         const user = JSON.parse(savedUser);
-        if (user && user.id) {
+        if (user && user.id && user.token) {
           setCurrentUser(user);
           setIsAuthenticated(true);
         }
@@ -69,11 +69,11 @@ const App: React.FC = () => {
     }, 4000);
   }, []);
 
-  const login = (user: User | Driver) => {
-    setCurrentUser(user);
+  const login = (userWithToken: any) => {
+    setCurrentUser(userWithToken);
     setIsAuthenticated(true);
-    localStorage.setItem('speedride_session', JSON.stringify(user));
-    showToast(`Neural Link Established. Welcome, ${user.name}`, 'success');
+    localStorage.setItem('speedride_session', JSON.stringify(userWithToken));
+    showToast(`Neural Link Established. Welcome, ${userWithToken.name}`, 'success');
   };
 
   const logout = () => {
@@ -84,11 +84,16 @@ const App: React.FC = () => {
   };
 
   const refreshUser = async () => {
-    if (currentUser) {
-      const updated = await db.users.getById(currentUser.id);
-      if (updated) {
-        setCurrentUser(updated);
-        localStorage.setItem('speedride_session', JSON.stringify(updated));
+    if (currentUser && currentUser.id) {
+      try {
+        const updated = await db.users.getById(currentUser.id);
+        if (updated) {
+          const freshUser = { ...updated, token: currentUser.token };
+          setCurrentUser(freshUser);
+          localStorage.setItem('speedride_session', JSON.stringify(freshUser));
+        }
+      } catch (e) {
+        console.error("Failed to refresh user from core", e);
       }
     }
   };
@@ -102,7 +107,7 @@ const App: React.FC = () => {
       <div className="w-48 h-1.5 bg-slate-100 rounded-full overflow-hidden relative">
         <div className="absolute inset-0 bg-blue-600 animate-loading-bar"></div>
       </div>
-      <p className="mt-6 text-[10px] font-black uppercase tracking-[0.4em] text-slate-300">Warming Engine Core...</p>
+      <p className="mt-6 text-[10px] font-black uppercase tracking-[0.4em] text-slate-300">Synchronizing with Core Database...</p>
     </div>
   );
 

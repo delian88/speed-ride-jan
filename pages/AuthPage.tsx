@@ -79,35 +79,32 @@ const AuthPage: React.FC = () => {
     setIsLoading(true);
     setError('');
     
-    const trimmedEmail = formData.email.trim();
-    const cleanPassword = formData.password.trim();
-
     try {
-      const user = await db.users.getByEmail(trimmedEmail);
-      if (user) {
-         if ((user as any).password === cleanPassword) {
-            if (user.role === role) {
-               login(user);
-               // Wait for toast to be seen before redirecting
-               setTimeout(() => {
-                 navigate(`/${role.toLowerCase()}`);
-               }, 1200);
-               return; // Exit early to keep loading state until navigation
-            } else {
-               const msg = `Role mismatch. This account is registered as ${user.role}.`;
-               setError(msg);
-               showToast(msg, "error");
-            }
-         } else {
-            setError("Incorrect password.");
-            showToast("Invalid credentials", "error");
-         }
-      } else {
-        setError("Account not found.");
-        showToast("Email not registered", "error");
+      // Direct call to real auth endpoint
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: formData.email.trim(),
+          password: formData.password.trim(),
+          role: role
+        })
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ message: 'Neural Link Refused' }));
+        throw new Error(err.message || 'Access Denied');
       }
-    } catch (err) {
-      showToast("Authentication server offline", "error");
+
+      const session = await response.json();
+      login(session);
+      
+      setTimeout(() => {
+        navigate(`/${role.toLowerCase()}`);
+      }, 1200);
+    } catch (err: any) {
+      setError(err.message);
+      showToast(err.message, "error");
     } finally {
       setIsLoading(false);
     }
@@ -123,13 +120,7 @@ const AuthPage: React.FC = () => {
     setIsLoading(true);
     setError('');
     try {
-      const existing = await db.users.getByEmail(formData.email);
-      if (existing) {
-        showToast("User already registered", "error");
-        setIsLoading(false);
-        return;
-      }
-      
+      // In production, we first verify the email via OTP
       const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
       setCorrectOtp(newOtp);
       await sendOtpEmail(formData.email, newOtp);
@@ -216,7 +207,7 @@ const AuthPage: React.FC = () => {
           licenseDoc: formData.licenseDoc,
           ninDoc: formData.ninDoc
         } : {})
-      } as any);
+      });
 
       if (role !== 'ADMIN') {
         await sendWelcomeEmail({
@@ -229,14 +220,13 @@ const AuthPage: React.FC = () => {
       showToast("Account Provisioned", "success");
       setView('SUCCESS');
       setTimeout(() => {
-        login(newUser as any);
-        // Delay navigation to let the "Neural Link Established" toast show
+        login(newUser);
         setTimeout(() => {
           navigate(`/${role.toLowerCase()}`);
         }, 1200);
       }, 2000);
-    } catch (err) {
-      showToast("Database commit failed", "error");
+    } catch (err: any) {
+      showToast(err.message || "Database commit failed", "error");
     } finally {
       setIsLoading(false);
     }
