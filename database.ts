@@ -1,88 +1,66 @@
 
 import { User, Driver, RideRequest, RideStatus, VehicleType, UserRole } from './types';
 
-// This class simulates a real database interaction with persistence in LocalStorage
 class MockDatabase {
-  private prefix = 'speedride_db_';
+  private prefix = 'speedride_db_v2_';
 
   private get(table: string): any[] {
     try {
       const data = localStorage.getItem(this.prefix + table);
       if (!data) return [];
-      const parsed = JSON.parse(data);
-      return Array.isArray(parsed) ? parsed : [];
+      return JSON.parse(data);
     } catch (e) {
-      console.error(`Database read error for ${table}:`, e);
       return [];
     }
   }
 
   private set(table: string, data: any[] | any): void {
-    try {
-      localStorage.setItem(this.prefix + table, JSON.stringify(data));
-    } catch (e) {
-      console.error(`Database write error for ${table}:`, e);
-    }
+    localStorage.setItem(this.prefix + table, JSON.stringify(data));
   }
 
-  // Settings
   settings = {
-    get: async (): Promise<{ 
-      pricePerKm: number, 
-      baseFare: number, 
-      commission: number, 
-      maintenanceMode: boolean,
-      globalAlert: string 
-    }> => {
-      await this.delay(100);
-      try {
-        const data = localStorage.getItem(this.prefix + 'settings');
-        return data ? JSON.parse(data) : { 
-          pricePerKm: 2000, 
-          baseFare: 1000, 
-          commission: 20, 
-          maintenanceMode: false,
-          globalAlert: '' 
-        };
-      } catch {
-        return { 
-          pricePerKm: 2000, 
-          baseFare: 1000, 
-          commission: 20, 
-          maintenanceMode: false,
-          globalAlert: '' 
-        };
-      }
+    get: async () => {
+      const data = localStorage.getItem(this.prefix + 'settings');
+      return data ? JSON.parse(data) : { 
+        pricePerKm: 450, 
+        baseFare: 1200, 
+        commission: 20, 
+        maintenanceMode: false
+      };
     },
-    update: async (updates: any): Promise<void> => {
-      await this.delay(200);
+    update: async (updates: any) => {
       const current = await this.settings.get();
       this.set('settings', { ...current, ...updates });
     }
   };
 
-  // Users Table
   users = {
     getAll: async (): Promise<User[]> => {
-      await this.delay();
       return this.get('users');
     },
     getById: async (id: string): Promise<User | undefined> => {
-      await this.delay();
       return this.get('users').find(u => u.id === id);
     },
     getByEmail: async (email: string): Promise<User | undefined> => {
-      await this.delay();
       const searchEmail = email.trim().toLowerCase();
       return this.get('users').find(u => u.email.toLowerCase() === searchEmail);
     },
+    // Fix: Adding missing updatePassword method for auth recovery flow
+    updatePassword: async (email: string, password: string): Promise<boolean> => {
+      const users = this.get('users');
+      const searchEmail = email.trim().toLowerCase();
+      const idx = users.findIndex(u => u.email.toLowerCase() === searchEmail);
+      if (idx === -1) return false;
+      users[idx].password = password;
+      this.set('users', users);
+      return true;
+    },
     create: async (userData: Partial<User | Driver>): Promise<User | Driver> => {
-      await this.delay();
       const users = this.get('users');
       const newUser = {
         id: 'u_' + Math.random().toString(36).substr(2, 9),
         rating: 5.0,
-        balance: 2500, // Starting bonus
+        balance: 5000, 
         createdAt: new Date().toISOString(),
         ...userData
       } as any;
@@ -91,7 +69,6 @@ class MockDatabase {
       return newUser;
     },
     update: async (id: string, updates: Partial<User | Driver>): Promise<User | Driver> => {
-      await this.delay();
       const users = this.get('users');
       const idx = users.findIndex(u => u.id === id);
       if (idx === -1) throw new Error("User not found");
@@ -99,27 +76,14 @@ class MockDatabase {
       this.set('users', users);
       return users[idx];
     },
-    delete: async (id: string): Promise<void> => {
-      await this.delay();
+    getOnlineDrivers: async (type?: VehicleType): Promise<Driver[]> => {
       const users = this.get('users');
-      const filtered = users.filter(u => u.id !== id);
-      this.set('users', filtered);
-    },
-    updatePassword: async (email: string, newPassword: string): Promise<boolean> => {
-      await this.delay();
-      const users = this.get('users');
-      const idx = users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
-      if (idx === -1) return false;
-      users[idx].password = newPassword; 
-      this.set('users', users);
-      return true;
+      return users.filter(u => u.role === 'DRIVER' && u.isOnline && (!type || u.vehicleType === type));
     }
   };
 
-  // Rides Table
   rides = {
     create: async (ride: Partial<RideRequest>): Promise<RideRequest> => {
-      await this.delay();
       const rides = this.get('rides');
       const newRide = {
         id: 'r_' + Math.random().toString(36).substr(2, 9),
@@ -132,20 +96,32 @@ class MockDatabase {
       return newRide;
     },
     getAll: async (): Promise<RideRequest[]> => {
-      await this.delay();
       return this.get('rides');
     },
     getByUser: async (userId: string): Promise<RideRequest[]> => {
-      await this.delay();
       return this.get('rides').filter((r: RideRequest) => r.riderId === userId || r.driverId === userId);
     },
-    updateStatus: async (rideId: string, status: RideStatus): Promise<void> => {
-      await this.delay();
+    getAvailableForDriver: async (vehicleType: VehicleType): Promise<RideRequest[]> => {
+      return this.get('rides').filter((r: RideRequest) => r.status === RideStatus.REQUESTED && r.vehicleType === vehicleType);
+    },
+    updateStatus: async (rideId: string, status: RideStatus, driverId?: string): Promise<void> => {
       const rides = this.get('rides');
       const idx = rides.findIndex((r: RideRequest) => r.id === rideId);
       if (idx !== -1) {
         rides[idx].status = status;
+        if (driverId) rides[idx].driverId = driverId;
         this.set('rides', rides);
+
+        // Transaction logic if completed
+        if (status === RideStatus.COMPLETED) {
+          const ride = rides[idx];
+          const users = this.get('users');
+          const dIdx = users.findIndex(u => u.id === ride.driverId);
+          const rIdx = users.findIndex(u => u.id === ride.riderId);
+          if (dIdx !== -1) users[dIdx].balance += (ride.fare * 0.8); // 80% to driver
+          if (rIdx !== -1) users[rIdx].balance -= ride.fare;
+          this.set('users', users);
+        }
       }
     }
   };
@@ -156,95 +132,33 @@ class MockDatabase {
 
   init() {
     let users = this.get('users');
-    
-    // Hardcoded Master Admin Identities
-    const masterAdmins = [
-      {
-        id: 'a1',
-        name: 'Super Admin',
-        email: 'admin',
-        password: 'admin123',
-        phone: '+234 803 000 0000',
-        role: 'ADMIN' as UserRole,
-        avatar: 'https://i.pravatar.cc/150?u=admin',
-        rating: 5.0,
-        balance: 0,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'a2',
-        name: 'Khalid',
-        email: 'khalid@gmail.com',
-        password: 'khalid123',
-        phone: '+234 810 555 1234',
-        role: 'ADMIN' as UserRole,
-        avatar: 'https://i.pravatar.cc/150?u=khalid',
-        rating: 5.0,
-        balance: 0,
-        createdAt: new Date().toISOString()
-      }
-    ];
-
-    // Other Seed Data
-    const seedExtras = [
-      {
-        id: 'u1',
-        name: 'Demo Rider',
-        email: 'rider@speedride.com',
-        password: 'password123',
-        phone: '+234 801 234 5678',
-        role: 'RIDER' as UserRole,
-        avatar: 'https://i.pravatar.cc/150?u=rider',
-        rating: 4.8,
-        balance: 25000,
-        createdAt: new Date().toISOString()
-      },
-      {
-        id: 'd1',
-        name: 'Adebayo Tunde',
-        email: 'driver@speedride.com',
-        password: 'password123',
-        phone: '+234 802 345 6789',
-        role: 'DRIVER' as UserRole,
-        avatar: 'https://i.pravatar.cc/150?u=driver',
-        rating: 4.9,
-        balance: 150000,
-        vehicleType: VehicleType.PREMIUM,
-        vehicleModel: 'Tesla Model 3 (2026)',
-        plateNumber: 'LAG-777-2026',
-        isOnline: true,
-        isVerified: true,
-        createdAt: new Date().toISOString()
-      }
-    ];
-
     if (users.length === 0) {
-      this.set('users', [...masterAdmins, ...seedExtras]);
-    } else {
-      // MASTER ADMIN SYNC: Ensure these accounts always match requested credentials
-      masterAdmins.forEach(master => {
-        const idx = users.findIndex(u => u.email.toLowerCase() === master.email.toLowerCase());
-        if (idx === -1) {
-          users.push(master);
-        } else {
-          // Force overwrite with correct role and password
-          users[idx] = { ...users[idx], ...master };
+      const masterAdmins = [
+        {
+          id: 'admin_1',
+          name: 'Super Admin',
+          email: 'admin',
+          password: 'admin123',
+          phone: '+234 803 000 0000',
+          role: 'ADMIN',
+          avatar: 'https://i.pravatar.cc/150?u=admin',
+          balance: 0,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: 'admin_2',
+          name: 'Khalid',
+          email: 'khalid@gmail.com',
+          password: 'khalid123',
+          phone: '+234 810 555 1234',
+          role: 'ADMIN',
+          avatar: 'https://i.pravatar.cc/150?u=khalid',
+          balance: 0,
+          createdAt: new Date().toISOString()
         }
-      });
-      this.set('users', users);
+      ];
+      this.set('users', masterAdmins);
     }
-    
-    if (!localStorage.getItem(this.prefix + 'settings')) {
-      this.set('settings', { 
-        pricePerKm: 2000, 
-        baseFare: 1000, 
-        commission: 20, 
-        maintenanceMode: false,
-        globalAlert: '' 
-      });
-    }
-    
-    console.log("SpeedRide 2026 Database: Neural Node Link Active.");
   }
 }
 

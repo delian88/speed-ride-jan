@@ -3,6 +3,7 @@
   "description": "A production-ready Uber-style ride-hailing application with real-time tracking, driver matching, and comprehensive admin management.",
   "requestFramePermissions": [
     "camera",
+    "microphone",
     "geolocation"
   ]
 }
