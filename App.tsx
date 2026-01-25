@@ -1,9 +1,10 @@
 
-import React, { useState, useEffect, createContext, useContext } from 'react';
+import React, { useState, useEffect, createContext, useContext, useCallback } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { db } from './database';
-import { User, Driver, UserRole } from './types';
+import { User, Driver } from './types';
 import Logo from './components/Logo';
+import { CheckCircle, AlertCircle, X, Info } from 'lucide-react';
 
 // Pages
 import LandingPage from './pages/LandingPage';
@@ -12,12 +13,21 @@ import RiderDashboard from './pages/RiderDashboard';
 import DriverDashboard from './pages/DriverDashboard';
 import AdminDashboard from './pages/AdminDashboard';
 
+type ToastType = 'success' | 'error' | 'info';
+
+interface Toast {
+  id: string;
+  message: string;
+  type: ToastType;
+}
+
 interface AppContextType {
   currentUser: User | Driver | null;
   isAuthenticated: boolean;
   login: (user: User | Driver) => void;
   logout: () => void;
   refreshUser: () => Promise<void>;
+  showToast: (message: string, type?: ToastType) => void;
 }
 
 const AppContext = createContext<AppContextType | null>(null);
@@ -32,44 +42,45 @@ const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<User | Driver | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [toasts, setToasts] = useState<Toast[]>([]);
 
   useEffect(() => {
-    console.log("App initializing...");
     const savedUser = localStorage.getItem('speedride_session');
     if (savedUser && savedUser !== 'undefined') {
       try {
         const user = JSON.parse(savedUser);
         if (user && user.id) {
-          console.log("Session recovered for:", user.name);
           setCurrentUser(user);
           setIsAuthenticated(true);
         }
       } catch (err) {
-        console.error("Session parse failed:", err);
         localStorage.removeItem('speedride_session');
       }
     }
-    
-    // Branding impact + session warming
-    const timer = setTimeout(() => {
-      console.log("Core fusion ignited.");
-      setIsInitializing(false);
-    }, 1500);
+    const timer = setTimeout(() => setIsInitializing(false), 1500);
     return () => clearTimeout(timer);
   }, []);
 
+  const showToast = useCallback((message: string, type: ToastType = 'info') => {
+    const id = Math.random().toString(36).substr(2, 9);
+    setToasts(prev => [...prev, { id, message, type }]);
+    setTimeout(() => {
+      setToasts(prev => prev.filter(t => t.id !== id));
+    }, 4000);
+  }, []);
+
   const login = (user: User | Driver) => {
-    console.log("Logging in user:", user.email);
     setCurrentUser(user);
     setIsAuthenticated(true);
     localStorage.setItem('speedride_session', JSON.stringify(user));
+    showToast(`Neural Link Established. Welcome, ${user.name}`, 'success');
   };
 
   const logout = () => {
-    console.log("Logging out.");
     setCurrentUser(null);
     setIsAuthenticated(false);
     localStorage.removeItem('speedride_session');
+    showToast("Node Disconnected. Safe travels.", 'info');
   };
 
   const refreshUser = async () => {
@@ -96,28 +107,40 @@ const App: React.FC = () => {
   );
 
   return (
-    <AppContext.Provider value={{ currentUser, isAuthenticated, login, logout, refreshUser }}>
+    <AppContext.Provider value={{ currentUser, isAuthenticated, login, logout, refreshUser, showToast }}>
       <HashRouter>
-        <div className="min-h-screen bg-gray-50 flex flex-col">
+        <div className="min-h-screen bg-gray-50 flex flex-col relative">
+          {/* Toast Container */}
+          <div className="fixed top-24 right-6 z-[9999] flex flex-col items-end space-y-3 pointer-events-none">
+            {toasts.map(toast => (
+              <div 
+                key={toast.id} 
+                className={`pointer-events-auto flex items-center space-x-3 px-6 py-4 rounded-[24px] shadow-2xl animate-in slide-in-from-right-10 duration-300 border backdrop-blur-md ${
+                  toast.type === 'success' ? 'bg-emerald-50 border-emerald-100 text-emerald-900' :
+                  toast.type === 'error' ? 'bg-red-50 border-red-100 text-red-900' :
+                  'bg-white border-slate-100 text-slate-900'
+                }`}
+              >
+                {toast.type === 'success' && <CheckCircle className="w-5 h-5 text-emerald-500" />}
+                {toast.type === 'error' && <AlertCircle className="w-5 h-5 text-red-500" />}
+                {toast.type === 'info' && <Info className="w-5 h-5 text-blue-500" />}
+                <span className="font-black text-xs uppercase tracking-widest">{toast.message}</span>
+                <button 
+                  onClick={() => setToasts(prev => prev.filter(t => t.id !== toast.id))}
+                  className="p-1 hover:bg-black/5 rounded-lg transition"
+                >
+                  <X className="w-4 h-4 opacity-40" />
+                </button>
+              </div>
+            ))}
+          </div>
+
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/auth" element={<AuthPage />} />
-            
-            <Route path="/rider/*" element={
-              isAuthenticated && currentUser?.role === 'RIDER' ? 
-              <RiderDashboard /> : <Navigate to="/auth" />
-            } />
-            
-            <Route path="/driver/*" element={
-              isAuthenticated && currentUser?.role === 'DRIVER' ? 
-              <DriverDashboard /> : <Navigate to="/auth" />
-            } />
-
-            <Route path="/admin/*" element={
-              isAuthenticated && currentUser?.role === 'ADMIN' ? 
-              <AdminDashboard /> : <Navigate to="/auth" />
-            } />
-
+            <Route path="/rider/*" element={isAuthenticated && currentUser?.role === 'RIDER' ? <RiderDashboard /> : <Navigate to="/auth" />} />
+            <Route path="/driver/*" element={isAuthenticated && currentUser?.role === 'DRIVER' ? <DriverDashboard /> : <Navigate to="/auth" />} />
+            <Route path="/admin/*" element={isAuthenticated && currentUser?.role === 'ADMIN' ? <AdminDashboard /> : <Navigate to="/auth" />} />
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
         </div>

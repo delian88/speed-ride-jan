@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../App';
 import { db } from '../database';
@@ -7,7 +7,7 @@ import { sendWelcomeEmail, sendOtpEmail, sendResetEmail } from '../services/mail
 import { 
   Mail, Lock, Phone, User as UserIcon, Shield, 
   ChevronRight, Zap, ChevronLeft,
-  FileText, Car, Smartphone, AlertCircle, Upload, CheckCircle as CheckCircleIcon, Image as ImageIcon,
+  FileText, Car, Smartphone, AlertCircle, Upload, CheckCircle as CheckCircleIcon,
   Wifi, Info, RefreshCw
 } from 'lucide-react';
 import Logo from '../components/Logo';
@@ -41,16 +41,14 @@ const AuthPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   
-  // Virtual Mail Interceptor State
   const [interceptedMail, setInterceptedMail] = useState<InterceptedMail | null>(null);
 
-  const { login } = useApp();
+  const { login, showToast } = useApp();
   const navigate = useNavigate();
 
   useEffect(() => {
     const handleMailIntercept = (e: any) => {
       setInterceptedMail(e.detail);
-      // Auto-dismiss after 12 seconds
       setTimeout(() => setInterceptedMail(null), 12000);
     };
     window.addEventListener('speedride_mail_intercept', handleMailIntercept);
@@ -61,7 +59,7 @@ const AuthPage: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 5 * 1024 * 1024) {
-      setError("File is too large. Maximum size is 5MB.");
+      showToast("File exceeds 5MB limit", "error");
       return;
     }
     const reader = new FileReader();
@@ -81,7 +79,6 @@ const AuthPage: React.FC = () => {
     setIsLoading(true);
     setError('');
     
-    // Sanitization
     const trimmedEmail = formData.email.trim();
     const cleanPassword = formData.password.trim();
 
@@ -93,16 +90,20 @@ const AuthPage: React.FC = () => {
                login(user);
                navigate(`/${role.toLowerCase()}`);
             } else {
-               setError(`Email found, but role mismatch. Please select the ${user.role} tab.`);
+               const msg = `Role mismatch. This account is registered as ${user.role}.`;
+               setError(msg);
+               showToast(msg, "error");
             }
          } else {
             setError("Incorrect password.");
+            showToast("Invalid credentials", "error");
          }
       } else {
-        setError("Account not found. Please check the email address.");
+        setError("Account not found.");
+        showToast("Email not registered", "error");
       }
     } catch (err) {
-      setError("An error occurred during authentication.");
+      showToast("Authentication server offline", "error");
     } finally {
       setIsLoading(false);
     }
@@ -111,7 +112,7 @@ const AuthPage: React.FC = () => {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (role === 'DRIVER' && (!formData.licenseDoc || !formData.ninDoc)) {
-      setError("Please upload both Driver's License and NIN for verification.");
+      showToast("Documents required for Driver nodes", "error");
       return;
     }
 
@@ -120,7 +121,7 @@ const AuthPage: React.FC = () => {
     try {
       const existing = await db.users.getByEmail(formData.email);
       if (existing) {
-        setError("User already exists with this email.");
+        showToast("User already registered", "error");
         setIsLoading(false);
         return;
       }
@@ -128,9 +129,10 @@ const AuthPage: React.FC = () => {
       const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
       setCorrectOtp(newOtp);
       await sendOtpEmail(formData.email, newOtp);
+      showToast("Verification code transmitted", "success");
       setView('OTP');
     } catch (err) {
-      setError("Registration flow failed.");
+      showToast("Failed to initiate signup", "error");
     } finally {
       setIsLoading(false);
     }
@@ -143,7 +145,7 @@ const AuthPage: React.FC = () => {
     try {
       const user = await db.users.getByEmail(formData.email);
       if (!user) {
-        setError("No account found with this email address.");
+        showToast("Email not found", "error");
         setIsLoading(false);
         return;
       }
@@ -151,9 +153,10 @@ const AuthPage: React.FC = () => {
       const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
       setCorrectOtp(newOtp);
       await sendResetEmail(formData.email, newOtp);
+      showToast("Recovery signal sent", "success");
       setView('RESET');
     } catch (err) {
-      setError("Failed to initiate recovery.");
+      showToast("Recovery flow interrupted", "error");
     } finally {
       setIsLoading(false);
     }
@@ -163,15 +166,11 @@ const AuthPage: React.FC = () => {
     e.preventDefault();
     const enteredOtp = otp.join('');
     if (enteredOtp !== correctOtp) {
-      setError("Invalid security code.");
+      showToast("Security code invalid", "error");
       return;
     }
     if (formData.password !== formData.confirmPassword) {
-      setError("Passwords do not match.");
-      return;
-    }
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters.");
+      showToast("Passwords mismatch", "error");
       return;
     }
 
@@ -179,13 +178,10 @@ const AuthPage: React.FC = () => {
     try {
       const success = await db.users.updatePassword(formData.email, formData.password);
       if (success) {
+        showToast("Password synced successfully", "success");
         setView('SUCCESS');
         setTimeout(() => setView('LOGIN'), 3000);
-      } else {
-        setError("Failed to update password.");
       }
-    } catch (err) {
-      setError("An unexpected error occurred.");
     } finally {
       setIsLoading(false);
     }
@@ -194,14 +190,12 @@ const AuthPage: React.FC = () => {
   const handleVerifyOtp = async () => {
     const enteredOtp = otp.join('');
     if (enteredOtp !== correctOtp) {
-      setError("Invalid verification code. Please check the interceptor at the top.");
+      showToast("Verification failed", "error");
       return;
     }
 
     setIsLoading(true);
-    setError('');
     try {
-      // Fix: Cast the object to any to allow the 'password' property in the mock database create call
       const newUser = await db.users.create({
         name: formData.name,
         email: formData.email,
@@ -228,13 +222,14 @@ const AuthPage: React.FC = () => {
         });
       }
 
+      showToast("Account Provisioned", "success");
       setView('SUCCESS');
       setTimeout(() => {
         login(newUser as any);
         navigate(`/${role.toLowerCase()}`);
       }, 2000);
     } catch (err) {
-      setError("OTP Verification failed.");
+      showToast("Database commit failed", "error");
     } finally {
       setIsLoading(false);
     }
@@ -245,7 +240,6 @@ const AuthPage: React.FC = () => {
       const newOtp = [...otp];
       newOtp[index] = value;
       setOtp(newOtp);
-      setError('');
       if (value && index < 5) {
         document.getElementById(`otp-${index + 1}`)?.focus();
       }
@@ -257,11 +251,11 @@ const AuthPage: React.FC = () => {
       case 'SUCCESS':
         return (
           <div className="text-center py-10 space-y-6 animate-in zoom-in duration-500">
-            <div className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto shadow-lg">
+            <div className="w-20 h-20 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto shadow-lg">
               <CheckCircleIcon className="h-10 w-10" />
             </div>
-            <h2 className="text-3xl font-black text-slate-900">Success!</h2>
-            <p className="text-slate-500 font-bold">Operation completed. You're being redirected...</p>
+            <h2 className="text-3xl font-black text-slate-900 tracking-tighter">SUCCESS</h2>
+            <p className="text-slate-500 font-bold uppercase tracking-widest text-xs">Redirecting to Dashboard...</p>
           </div>
         );
 
@@ -269,24 +263,22 @@ const AuthPage: React.FC = () => {
         return (
           <form onSubmit={handleForgotPassword} className="space-y-6 animate-in fade-in duration-500">
             <button type="button" onClick={() => setView('LOGIN')} className="flex items-center text-slate-400 font-black text-xs uppercase tracking-widest hover:text-blue-600 transition">
-              <ChevronLeft className="w-4 h-4 mr-1" /> Back to Login
+              <ChevronLeft className="w-4 h-4 mr-1" /> Back
             </button>
-            <h2 className="text-2xl font-black text-slate-900 text-center">Recover Account</h2>
-            <p className="text-slate-500 font-medium text-center text-sm px-4">Enter your email and we'll transmit a secure recovery code to your inbox.</p>
+            <h2 className="text-2xl font-black text-slate-900 text-center tracking-tight uppercase">Recover</h2>
             <div className="relative">
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-              <input name="email" type="text" placeholder="Email Address" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
+              <input name="email" type="text" placeholder="Email Address" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
             </div>
-            {error && <div className="text-red-600 text-xs font-bold bg-red-50 p-3 rounded-lg text-center">{error}</div>}
-            <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-blue-600 transition shadow-xl" disabled={isLoading}>{isLoading ? "Processing Request..." : "Send Recovery Code"}</button>
+            <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-blue-600 transition shadow-xl uppercase tracking-widest text-xs" disabled={isLoading}>{isLoading ? "TRANSMITTING..." : "SEND CODE"}</button>
           </form>
         );
 
       case 'RESET':
         return (
           <form onSubmit={handleResetPassword} className="space-y-6 animate-in fade-in duration-500">
-            <h2 className="text-2xl font-black text-slate-900 text-center">Set New Password</h2>
-            <div className="flex justify-center space-x-2 mb-6">
+            <h2 className="text-2xl font-black text-slate-900 text-center uppercase tracking-tight">Provision New</h2>
+            <div className="flex justify-center space-x-2">
               {otp.map((digit, i) => (
                 <input
                   key={i} id={`otp-${i}`} type="text" maxLength={1} value={digit}
@@ -298,15 +290,14 @@ const AuthPage: React.FC = () => {
             <div className="space-y-4">
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input name="password" type="password" placeholder="New Password" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
+                <input name="password" type="password" placeholder="New Secret" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
               </div>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
+                <input name="confirmPassword" type="password" placeholder="Confirm Secret" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
               </div>
             </div>
-            {error && <div className="text-red-600 text-xs font-bold bg-red-50 p-3 rounded-lg text-center">{error}</div>}
-            <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition shadow-xl" disabled={isLoading}>{isLoading ? "Resetting Password..." : "Update Password"}</button>
+            <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition shadow-xl uppercase tracking-widest text-xs" disabled={isLoading}>{isLoading ? "SYNCING..." : "COMMIT SECRET"}</button>
           </form>
         );
 
@@ -316,26 +307,21 @@ const AuthPage: React.FC = () => {
             <div className="bg-blue-100 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-6">
               <Wifi className="text-blue-600 w-8 h-8 animate-pulse" />
             </div>
-            <h2 className="text-2xl font-black text-slate-900">Verify Transmission</h2>
-            <div className="text-slate-500 font-medium leading-relaxed px-4 space-y-2">
-              <p>Intercepting secure code for:</p>
-              <p className="text-slate-900 font-black py-1 px-3 bg-blue-50 rounded-lg inline-block">{formData.email}</p>
-            </div>
+            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Verify Node</h2>
             <div className="flex justify-center space-x-2">
               {otp.map((digit, i) => (
                 <input
                   key={i} id={`otp-${i}`} type="text" maxLength={1} value={digit}
                   onChange={(e) => handleOtpChange(i, e.target.value)}
-                  className={`w-10 h-14 md:w-12 md:h-16 text-center text-xl font-black bg-slate-50 border-2 rounded-xl focus:border-blue-600 outline-none transition ${error ? 'border-red-200' : 'border-slate-100'}`}
+                  className={`w-10 h-14 md:w-12 md:h-16 text-center text-xl font-black bg-slate-50 border-2 rounded-xl focus:border-blue-600 outline-none transition border-slate-100`}
                 />
               ))}
             </div>
-            {error && <p className="text-red-500 text-xs font-bold bg-red-50 p-3 rounded-xl">{error}</p>}
             <button 
               onClick={handleVerifyOtp} disabled={isLoading}
-              className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition shadow-xl disabled:opacity-50"
+              className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition shadow-xl uppercase tracking-widest text-xs"
             >
-              {isLoading ? "Validating Code..." : "Verify & Sign In"}
+              {isLoading ? "VALIDATING..." : "AUTHORIZE"}
             </button>
           </div>
         );
@@ -343,65 +329,35 @@ const AuthPage: React.FC = () => {
       case 'SIGNUP':
         return (
           <form onSubmit={handleSignup} className="space-y-4 animate-in fade-in duration-500">
-            <h2 className="text-2xl font-black text-slate-900 text-center mb-6">Create Account</h2>
+            <h2 className="text-2xl font-black text-slate-900 text-center mb-6 uppercase tracking-tight">Initialize</h2>
             <div className="flex bg-slate-100 p-1 rounded-xl mb-4">
-              {/* Removed ADMIN from signup selection */}
               {['RIDER', 'DRIVER'].map(r => (
-                <button key={r} type="button" onClick={() => setRole(r as any)} className={`flex-1 py-2 text-xs font-black rounded-lg transition ${role === r ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>{r}</button>
+                <button key={r} type="button" onClick={() => setRole(r as any)} className={`flex-1 py-2 text-[10px] font-black rounded-lg transition uppercase tracking-widest ${role === r ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>{r}</button>
               ))}
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div className="relative col-span-2 md:col-span-1">
-                <UserIcon className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input name="name" placeholder="Full Name" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
-              </div>
-              <div className="relative col-span-2 md:col-span-1">
-                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input name="phone" placeholder="Phone Number" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
-              </div>
+              <input name="name" placeholder="Name" required onChange={handleInputChange} className="w-full px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
+              <input name="phone" placeholder="Phone" required onChange={handleInputChange} className="w-full px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
             </div>
-            <div className="relative">
-              <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-              <input name="email" type="email" placeholder="Email Address" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
-            </div>
-            <div className="relative">
-              <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-              <input name="password" type="password" placeholder="Secure Password" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
-            </div>
+            <input name="email" type="email" placeholder="Email" required onChange={handleInputChange} className="w-full px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
+            <input name="password" type="password" placeholder="Secret Key" required onChange={handleInputChange} className="w-full px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
+            
             {role === 'DRIVER' && (
-              <div className="space-y-4 pt-4 border-t border-slate-100">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="relative">
-                    <Car className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <input name="vehicleModel" placeholder="Vehicle Model" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none font-bold" />
-                  </div>
-                  <div className="relative">
-                    <FileText className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                    <input name="plateNumber" placeholder="Plate Number" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none font-bold" />
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="relative group">
-                    <input type="file" accept="image/*" id="license-upload" className="hidden" onChange={(e) => handleFileUpload(e, 'licenseDoc')} />
-                    <label htmlFor="license-upload" className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${formData.licenseDoc ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200 hover:border-blue-400 hover:bg-blue-50'}`}>
-                      {formData.licenseDoc ? <CheckCircleIcon className="w-6 h-6 text-emerald-500 mb-1" /> : <Upload className="w-6 h-6 text-slate-400 mb-1" />}
-                      <span className="text-[10px] font-black text-slate-400 uppercase">{formData.licenseDoc ? 'License OK' : 'License'}</span>
-                    </label>
-                  </div>
-                  <div className="relative group">
-                    <input type="file" accept="image/*" id="nin-upload" className="hidden" onChange={(e) => handleFileUpload(e, 'ninDoc')} />
-                    <label htmlFor="nin-upload" className={`flex flex-col items-center justify-center p-4 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${formData.ninDoc ? 'bg-emerald-50 border-emerald-200' : 'bg-slate-50 border-slate-200 hover:border-blue-400 hover:bg-blue-50'}`}>
-                      {formData.ninDoc ? <CheckCircleIcon className="w-6 h-6 text-emerald-500 mb-1" /> : <Smartphone className="w-6 h-6 text-slate-400 mb-1" />}
-                      <span className="text-[10px] font-black text-slate-400 uppercase">{formData.ninDoc ? 'NIN OK' : 'NIN ID'}</span>
-                    </label>
-                  </div>
-                </div>
+              <div className="grid grid-cols-2 gap-4 pt-2">
+                <input name="vehicleModel" placeholder="Vehicle" required onChange={handleInputChange} className="px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-xs" />
+                <input name="plateNumber" placeholder="Plate" required onChange={handleInputChange} className="px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-xs" />
+                <label className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed bg-slate-50 cursor-pointer text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'licenseDoc')} />
+                  {formData.licenseDoc ? 'LICENSE OK' : 'LICENSE'}
+                </label>
+                <label className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed bg-slate-50 cursor-pointer text-[9px] font-black uppercase tracking-widest text-slate-400">
+                  <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'ninDoc')} />
+                  {formData.ninDoc ? 'NIN OK' : 'NIN ID'}
+                </label>
               </div>
             )}
-            {error && <div className="flex items-center space-x-2 text-red-600 text-sm font-bold bg-red-50 p-4 rounded-xl"><AlertCircle className="w-4 h-4" /> <span>{error}</span></div>}
-            <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition shadow-xl" disabled={isLoading}>{isLoading ? "Connecting to Mail Node..." : "Connect & Verify"}</button>
-            <p className="text-center font-bold text-slate-400">Already a member? <button type="button" onClick={() => setView('LOGIN')} className="text-blue-600">Sign In</button></p>
+            <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition shadow-xl uppercase tracking-widest text-xs mt-2" disabled={isLoading}>{isLoading ? "PROVISIONING..." : "PROCEED"}</button>
+            <p className="text-center font-bold text-slate-400 text-xs">Already registered? <button type="button" onClick={() => setView('LOGIN')} className="text-blue-600">Sign In</button></p>
           </form>
         );
 
@@ -409,32 +365,22 @@ const AuthPage: React.FC = () => {
       default:
         return (
           <form onSubmit={handleLogin} className="space-y-6 animate-in fade-in duration-500">
-            <h2 className="text-2xl font-black text-slate-900 text-center mb-6">Sign In</h2>
+            <h2 className="text-2xl font-black text-slate-900 text-center mb-6 uppercase tracking-tight">Connect</h2>
             <div className="flex bg-slate-100 p-1 rounded-xl">
               {['RIDER', 'DRIVER', 'ADMIN'].map(r => (
-                <button key={r} type="button" onClick={() => setRole(r as any)} className={`flex-1 py-2 text-xs font-black rounded-lg transition ${role === r ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>{r}</button>
+                <button key={r} type="button" onClick={() => setRole(r as any)} className={`flex-1 py-2 text-[10px] font-black rounded-lg transition uppercase tracking-widest ${role === r ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>{r}</button>
               ))}
             </div>
             <div className="space-y-4">
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input name="email" type="text" placeholder="Email or Username" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input name="password" type="password" placeholder="Password" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold" />
-              </div>
+              <input name="email" type="text" placeholder="Email / Username" required onChange={handleInputChange} className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
+              <input name="password" type="password" placeholder="Secret Key" required onChange={handleInputChange} className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
             </div>
-            {error && <div className="text-red-600 text-xs font-bold bg-red-50 p-4 rounded-xl text-center border border-red-100 flex items-center justify-center space-x-2 animate-in slide-in-from-top-2">
-              <AlertCircle className="w-4 h-4 shrink-0" />
-              <span>{error}</span>
-            </div>}
-            <div className="flex justify-between text-sm font-bold">
-               <label className="flex items-center space-x-2 cursor-pointer"><input type="checkbox" className="rounded" /> <span className="text-slate-500">Remember me</span></label>
-               <button type="button" onClick={() => setView('FORGOT')} className="text-blue-600 hover:underline">Forgot Password?</button>
+            <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
+               <label className="flex items-center space-x-2 cursor-pointer text-slate-500"><input type="checkbox" className="rounded-md" /> <span>Sync Session</span></label>
+               <button type="button" onClick={() => setView('FORGOT')} className="text-blue-600">Lost Secret?</button>
             </div>
-            <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-blue-600 transition shadow-xl" disabled={isLoading}>{isLoading ? "Authenticating..." : "Sign In"}</button>
-            <p className="text-center font-bold text-slate-400">New around here? <button type="button" onClick={() => setView('SIGNUP')} className="text-blue-600">Create Account</button></p>
+            <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-blue-600 transition shadow-xl uppercase tracking-[0.2em] text-xs" disabled={isLoading}>{isLoading ? "CONNECTING..." : "AUTHORIZE"}</button>
+            <p className="text-center font-bold text-slate-400 text-xs">New node? <button type="button" onClick={() => setView('SIGNUP')} className="text-blue-600 underline">Initialize Account</button></p>
           </form>
         );
     }
@@ -446,7 +392,6 @@ const AuthPage: React.FC = () => {
       {interceptedMail && (
         <div className="fixed top-6 left-1/2 -translate-x-1/2 w-full max-w-lg z-[200] animate-slide-top px-4">
            <div className="bg-slate-900 text-white p-6 rounded-[32px] shadow-2xl border-2 border-blue-500/50 backdrop-blur-xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 p-4"><div className="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div></div>
               <div className="flex items-center space-x-4 mb-4">
                 <div className="p-3 bg-blue-600 rounded-2xl"><Mail className="w-6 h-6" /></div>
                 <div>
@@ -459,7 +404,7 @@ const AuthPage: React.FC = () => {
               </div>
               {interceptedMail.otp && (
                 <div className="flex items-center justify-between">
-                   <div className="flex items-center space-x-2"><Zap className="w-4 h-4 text-yellow-400" /><span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Secure Access Code</span></div>
+                   <div className="flex items-center space-x-2 text-slate-400"><Zap className="w-4 h-4 text-yellow-400" /><span className="text-[10px] font-black uppercase tracking-widest">Access Code</span></div>
                    <span className="text-2xl font-black text-blue-400 tracking-[0.2em]">{interceptedMail.otp}</span>
                 </div>
               )}
@@ -467,10 +412,10 @@ const AuthPage: React.FC = () => {
         </div>
       )}
 
-      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-100/50 rounded-full blur-[120px] -z-10"></div>
-      <div className="max-w-md w-full bg-white rounded-[40px] shadow-2xl border border-white p-10">
+      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-100/30 rounded-full blur-[120px] -z-10"></div>
+      <div className="max-w-md w-full bg-white rounded-[40px] shadow-2xl border border-white p-10 animate-fade-up">
         <div className="flex flex-col items-center justify-center mb-10">
-          <Logo className="h-24 w-auto mb-2" />
+          <Logo className="h-20 w-auto" />
         </div>
         {renderView()}
         <div className="mt-10 pt-6 border-t border-slate-50 text-center">
