@@ -83,7 +83,11 @@ const AuthPage: React.FC = () => {
       const email = formData.email.trim();
       const password = formData.password.trim();
 
-      // Use the new simulated auth login
+      if (!email || !password) {
+        throw new Error("Missing credentials.");
+      }
+
+      // Use the simulated auth login
       const session = await db.auth.login(email, password, role);
       
       login(session);
@@ -91,7 +95,7 @@ const AuthPage: React.FC = () => {
       // Delay navigation to ensure toast visibility
       setTimeout(() => {
         navigate(`/${role.toLowerCase()}`);
-      }, 1200);
+      }, 1500);
     } catch (err: any) {
       setError(err.message);
       showToast(err.message, "error");
@@ -212,7 +216,7 @@ const AuthPage: React.FC = () => {
         login(newUser);
         setTimeout(() => {
           navigate(`/${role.toLowerCase()}`);
-        }, 1200);
+        }, 1500);
       }, 2000);
     } catch (err: any) {
       showToast(err.message || "Database commit failed", "error");

@@ -3,11 +3,10 @@ import { User, Driver, RideRequest, RideStatus, VehicleType } from './types';
 
 /**
  * SPEEDRIDE 2026 | Neural Data Engine
- * This module simulates a production PostgreSQL environment using the schema.sql as a blueprint.
- * It provides a persistent, role-aware data layer that behaves like a real API.
+ * Persistent PostgreSQL Simulation
  */
 
-const DB_KEY = 'speedride_db_v2';
+const DB_KEY = 'speedride_db_final_v1';
 
 interface SpeedRideDB {
   users: (User | Driver)[];
@@ -24,7 +23,7 @@ const INITIAL_DATA: SpeedRideDB = {
   users: [
     {
       id: 'admin_01',
-      name: 'SpeedAdmin',
+      name: 'System Admin',
       email: 'admin',
       phone: '08000000000',
       role: 'ADMIN',
@@ -32,9 +31,7 @@ const INITIAL_DATA: SpeedRideDB = {
       rating: 5.0,
       balance: 0,
       isVerified: true,
-      // We store the password in a real-world password_hash field conceptually, 
-      // but for this simulator, we'll keep it as a hidden property.
-      password: 'admin123'
+      password: 'admin123' // Hardcoded seed password
     } as any,
     {
       id: 'd1',
@@ -68,30 +65,43 @@ const getDB = (): SpeedRideDB => {
     localStorage.setItem(DB_KEY, JSON.stringify(INITIAL_DATA));
     return INITIAL_DATA;
   }
-  return JSON.parse(data);
+  const parsed = JSON.parse(data);
+  
+  // Safety check: ensure admin exists in current storage
+  const hasAdmin = parsed.users.some((u: any) => u.email === 'admin' && u.role === 'ADMIN');
+  if (!hasAdmin) {
+    parsed.users.push(INITIAL_DATA.users[0]);
+    localStorage.setItem(DB_KEY, JSON.stringify(parsed));
+  }
+  
+  return parsed;
 };
 
 const saveDB = (db: SpeedRideDB) => {
   localStorage.setItem(DB_KEY, JSON.stringify(db));
 };
 
-// Simulate API Latency
 const delay = (ms = 800) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const db = {
   auth: {
     login: async (email: string, password: string, role: string) => {
-      await delay();
+      await delay(1000); // Realistic network lag
       const currentDb = getDB();
+      
       const user = currentDb.users.find(u => 
         u.email.toLowerCase() === email.toLowerCase() && 
-        (u as any).password === password && 
         u.role === role
       );
 
-      if (!user) throw new Error("Invalid credentials or role mismatch.");
+      if (!user) {
+        throw new Error(`Account not found for ${role} role.`);
+      }
+
+      if ((user as any).password !== password) {
+        throw new Error("Invalid secret key. Access denied.");
+      }
       
-      // Return user with a mock JWT token
       return { ...user, token: `sr_jwt_${Math.random().toString(36).substr(2)}` };
     }
   },
@@ -118,7 +128,7 @@ export const db = {
     getById: async (id: string): Promise<User | Driver> => {
       await delay(300);
       const user = getDB().users.find(u => u.id === id);
-      if (!user) throw new Error("User not found");
+      if (!user) throw new Error("User node disconnected");
       return user;
     },
     getByEmail: async (email: string): Promise<User | undefined> => {
@@ -141,7 +151,7 @@ export const db = {
         ...userData,
         id: `u_${Math.random().toString(36).substr(2, 9)}`,
         rating: 5.0,
-        balance: userData.role === 'RIDER' ? 5000 : 0, // Starting bonus
+        balance: userData.role === 'RIDER' ? 5000 : 0,
         token: `sr_jwt_${Math.random().toString(36).substr(2)}`
       };
       currentDb.users.push(newUser);
@@ -188,17 +198,13 @@ export const db = {
       if (index !== -1) {
         currentDb.rides[index].status = status;
         if (driverId) currentDb.rides[index].driverId = driverId;
-        
-        // Handle financial logic on completion
         if (status === RideStatus.COMPLETED) {
           const ride = currentDb.rides[index];
           const riderIndex = currentDb.users.findIndex(u => u.id === ride.riderId);
           const driverIndex = currentDb.users.findIndex(u => u.id === ride.driverId);
-          
           if (riderIndex !== -1) currentDb.users[riderIndex].balance -= ride.fare;
           if (driverIndex !== -1) currentDb.users[driverIndex].balance += (ride.fare * 0.8);
         }
-        
         saveDB(currentDb);
       }
     },
