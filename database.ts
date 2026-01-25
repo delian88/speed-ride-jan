@@ -31,7 +31,19 @@ const INITIAL_DATA: SpeedRideDB = {
       rating: 5.0,
       balance: 0,
       isVerified: true,
-      password: 'admin123' // Hardcoded seed password
+      password: 'admin123'
+    } as any,
+    {
+      id: 'admin_khalid',
+      name: 'Khalid Admin',
+      email: 'khalid@gmail.com',
+      phone: '08123456789',
+      role: 'ADMIN',
+      avatar: 'https://i.pravatar.cc/150?u=khalid',
+      rating: 5.0,
+      balance: 0,
+      isVerified: true,
+      password: 'khalid123'
     } as any,
     {
       id: 'd1',
@@ -67,10 +79,18 @@ const getDB = (): SpeedRideDB => {
   }
   const parsed = JSON.parse(data);
   
-  // Safety check: ensure admin exists in current storage
-  const hasAdmin = parsed.users.some((u: any) => u.email === 'admin' && u.role === 'ADMIN');
-  if (!hasAdmin) {
+  // Safety check: ensure both admins exist in current storage
+  const hasDefaultAdmin = parsed.users.some((u: any) => u.email === 'admin' && u.role === 'ADMIN');
+  if (!hasDefaultAdmin) {
     parsed.users.push(INITIAL_DATA.users[0]);
+  }
+
+  const hasKhalidAdmin = parsed.users.some((u: any) => u.email === 'khalid@gmail.com' && u.role === 'ADMIN');
+  if (!hasKhalidAdmin) {
+    parsed.users.push(INITIAL_DATA.users[1]);
+  }
+
+  if (!hasDefaultAdmin || !hasKhalidAdmin) {
     localStorage.setItem(DB_KEY, JSON.stringify(parsed));
   }
   
