@@ -108,7 +108,7 @@ const AuthPage: React.FC = () => {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     if (role === 'DRIVER' && (!formData.licenseDoc || !formData.ninDoc)) {
-      showToast("Documents required for Driver nodes", "error");
+      showToast("Documents required for Driver accounts", "error");
       return;
     }
 
@@ -261,14 +261,14 @@ const AuthPage: React.FC = () => {
               <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
               <input name="email" type="text" placeholder="Email Address" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
             </div>
-            <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-blue-600 transition shadow-xl uppercase tracking-widest text-xs" disabled={isLoading}>{isLoading ? "TRANSMITTING..." : "SEND CODE"}</button>
+            <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-blue-600 transition shadow-xl uppercase tracking-widest text-xs" disabled={isLoading}>{isLoading ? "SENDING..." : "SEND CODE"}</button>
           </form>
         );
 
       case 'RESET':
         return (
           <form onSubmit={handleResetPassword} className="space-y-6 animate-in fade-in duration-500">
-            <h2 className="text-2xl font-black text-slate-900 text-center uppercase tracking-tight">Provision New</h2>
+            <h2 className="text-2xl font-black text-slate-900 text-center uppercase tracking-tight">Set New Password</h2>
             <div className="flex justify-center space-x-2">
               {otp.map((digit, i) => (
                 <input
@@ -281,14 +281,14 @@ const AuthPage: React.FC = () => {
             <div className="space-y-4">
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input name="password" type="password" placeholder="New Secret" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
+                <input name="password" type="password" placeholder="New Password" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
               </div>
               <div className="relative">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 w-5 h-5" />
-                <input name="confirmPassword" type="password" placeholder="Confirm Secret" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
+                <input name="confirmPassword" type="password" placeholder="Confirm Password" required onChange={handleInputChange} className="w-full pl-12 pr-4 py-4 bg-slate-50 border rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
               </div>
             </div>
-            <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition shadow-xl uppercase tracking-widest text-xs" disabled={isLoading}>{isLoading ? "SYNCING..." : "COMMIT SECRET"}</button>
+            <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition shadow-xl uppercase tracking-widest text-xs" disabled={isLoading}>{isLoading ? "SAVING..." : "UPDATE PASSWORD"}</button>
           </form>
         );
 
@@ -298,7 +298,7 @@ const AuthPage: React.FC = () => {
             <div className="bg-blue-100 p-4 rounded-full w-16 h-16 flex items-center justify-center mx-auto mb-6">
               <Wifi className="text-blue-600 w-8 h-8 animate-pulse" />
             </div>
-            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Verify Node</h2>
+            <h2 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Verify Account</h2>
             <div className="flex justify-center space-x-2">
               {otp.map((digit, i) => (
                 <input
@@ -312,7 +312,7 @@ const AuthPage: React.FC = () => {
               onClick={handleVerifyOtp} disabled={isLoading}
               className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition shadow-xl uppercase tracking-widest text-xs"
             >
-              {isLoading ? "VALIDATING..." : "AUTHORIZE"}
+              {isLoading ? "VALIDATING..." : "VERIFY"}
             </button>
           </div>
         );
@@ -320,7 +320,7 @@ const AuthPage: React.FC = () => {
       case 'SIGNUP':
         return (
           <form onSubmit={handleSignup} className="space-y-4 animate-in fade-in duration-500">
-            <h2 className="text-2xl font-black text-slate-900 text-center mb-6 uppercase tracking-tight">Initialize</h2>
+            <h2 className="text-2xl font-black text-slate-900 text-center mb-6 uppercase tracking-tight">Create Account</h2>
             <div className="flex bg-slate-100 p-1 rounded-xl mb-4">
               {['RIDER', 'DRIVER'].map(r => (
                 <button key={r} type="button" onClick={() => setRole(r as any)} className={`flex-1 py-2 text-[10px] font-black rounded-lg transition uppercase tracking-widest ${role === r ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>{r}</button>
@@ -331,7 +331,7 @@ const AuthPage: React.FC = () => {
               <input name="phone" placeholder="Phone" required onChange={handleInputChange} className="w-full px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
             </div>
             <input name="email" type="email" placeholder="Email" required onChange={handleInputChange} className="w-full px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
-            <input name="password" type="password" placeholder="Secret Key" required onChange={handleInputChange} className="w-full px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
+            <input name="password" type="password" placeholder="Password" required onChange={handleInputChange} className="w-full px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
             
             {role === 'DRIVER' && (
               <div className="grid grid-cols-2 gap-4 pt-2">
@@ -347,7 +347,7 @@ const AuthPage: React.FC = () => {
                 </label>
               </div>
             )}
-            <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition shadow-xl uppercase tracking-widest text-xs mt-2" disabled={isLoading}>{isLoading ? "PROVISIONING..." : "PROCEED"}</button>
+            <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition shadow-xl uppercase tracking-widest text-xs mt-2" disabled={isLoading}>{isLoading ? "CREATING..." : "SIGN UP"}</button>
             <p className="text-center font-bold text-slate-400 text-xs">Already registered? <button type="button" onClick={() => setView('LOGIN')} className="text-blue-600">Sign In</button></p>
           </form>
         );
@@ -356,21 +356,21 @@ const AuthPage: React.FC = () => {
       default:
         return (
           <form onSubmit={handleLogin} className="space-y-6 animate-in fade-in duration-500">
-            <h2 className="text-2xl font-black text-slate-900 text-center mb-6 uppercase tracking-tight">Connect</h2>
+            <h2 className="text-2xl font-black text-slate-900 text-center mb-6 uppercase tracking-tight">Sign In</h2>
             
             <div className="space-y-4">
               <input name="email" type="text" placeholder="Email / Username" required onChange={handleInputChange} className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
-              <input name="password" type="password" placeholder="Secret Key" required onChange={handleInputChange} className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
+              <input name="password" type="password" placeholder="Password" required onChange={handleInputChange} className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
             </div>
             
             <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
-               <label className="flex items-center space-x-2 cursor-pointer text-slate-500"><input type="checkbox" className="rounded-md" /> <span>Sync Session</span></label>
-               <button type="button" onClick={() => setView('FORGOT')} className="text-blue-600">Lost Secret?</button>
+               <label className="flex items-center space-x-2 cursor-pointer text-slate-500"><input type="checkbox" className="rounded-md" /> <span>Keep me signed in</span></label>
+               <button type="button" onClick={() => setView('FORGOT')} className="text-blue-600">Forgot Password?</button>
             </div>
             
-            <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-blue-600 transition shadow-xl uppercase tracking-[0.2em] text-xs" disabled={isLoading}>{isLoading ? "CONNECTING..." : "AUTHORIZE"}</button>
+            <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-blue-600 transition shadow-xl uppercase tracking-[0.2em] text-xs" disabled={isLoading}>{isLoading ? "SIGNING IN..." : "SIGN IN"}</button>
             
-            <p className="text-center font-bold text-slate-400 text-xs">New node? <button type="button" onClick={() => setView('SIGNUP')} className="text-blue-600 underline">Initialize Account</button></p>
+            <p className="text-center font-bold text-slate-400 text-xs">New account? <button type="button" onClick={() => setView('SIGNUP')} className="text-blue-600 underline">Create Account</button></p>
           </form>
         );
     }
