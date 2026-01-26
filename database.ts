@@ -3,10 +3,10 @@ import { User, Driver, RideRequest, RideStatus, VehicleType } from './types';
 
 /**
  * SPEEDRIDE 2026 | Neural Data Engine
- * Persistent PostgreSQL Simulation
+ * Persistent PostgreSQL Simulation - Version 3 (FIXED)
  */
 
-const DB_KEY = 'speedride_db_final_v1';
+const DB_KEY = 'speedride_db_v3_fixed';
 
 interface SpeedRideDB {
   users: (User | Driver)[];
@@ -73,40 +73,43 @@ const INITIAL_DATA: SpeedRideDB = {
 
 const getDB = (): SpeedRideDB => {
   const data = localStorage.getItem(DB_KEY);
+  let db: SpeedRideDB;
+  
   if (!data) {
-    localStorage.setItem(DB_KEY, JSON.stringify(INITIAL_DATA));
-    return INITIAL_DATA;
-  }
-  const parsed = JSON.parse(data);
-  
-  // Safety check: ensure both admins exist in current storage
-  const hasDefaultAdmin = parsed.users.some((u: any) => u.email === 'admin' && u.role === 'ADMIN');
-  if (!hasDefaultAdmin) {
-    parsed.users.push(INITIAL_DATA.users[0]);
-  }
-
-  const hasKhalidAdmin = parsed.users.some((u: any) => u.email === 'khalid@gmail.com' && u.role === 'ADMIN');
-  if (!hasKhalidAdmin) {
-    parsed.users.push(INITIAL_DATA.users[1]);
-  }
-
-  if (!hasDefaultAdmin || !hasKhalidAdmin) {
-    localStorage.setItem(DB_KEY, JSON.stringify(parsed));
+    db = INITIAL_DATA;
+  } else {
+    db = JSON.parse(data);
   }
   
-  return parsed;
+  // Aggressive fix: Ensure specific accounts exist and have the correct credentials
+  const ensureUser = (email: string, role: string, defaults: any) => {
+    const idx = db.users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+    if (idx === -1) {
+      db.users.push(defaults);
+    } else {
+      // Overwrite password and role to be absolutely certain
+      (db.users[idx] as any).password = defaults.password;
+      db.users[idx].role = defaults.role as any;
+    }
+  };
+
+  ensureUser('admin', 'ADMIN', INITIAL_DATA.users[0]);
+  ensureUser('khalid@gmail.com', 'ADMIN', INITIAL_DATA.users[1]);
+
+  localStorage.setItem(DB_KEY, JSON.stringify(db));
+  return db;
 };
 
 const saveDB = (db: SpeedRideDB) => {
   localStorage.setItem(DB_KEY, JSON.stringify(db));
 };
 
-const delay = (ms = 800) => new Promise(resolve => setTimeout(resolve, ms));
+const delay = (ms = 500) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const db = {
   auth: {
     login: async (email: string, password: string, role: string) => {
-      await delay(1000); // Realistic network lag
+      await delay(800);
       const currentDb = getDB();
       
       const user = currentDb.users.find(u => 
@@ -115,7 +118,12 @@ export const db = {
       );
 
       if (!user) {
-        throw new Error(`Account not found for ${role} role.`);
+        // Fallback: Check if user exists but has wrong role selected
+        const anyUser = currentDb.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+        if (anyUser) {
+          throw new Error(`Account found, but role is '${anyUser.role}'. Please select the correct tab.`);
+        }
+        throw new Error(`Node not found in '${role}' sector.`);
       }
 
       if ((user as any).password !== password) {
@@ -128,11 +136,11 @@ export const db = {
 
   settings: {
     get: async () => {
-      await delay(400);
+      await delay(200);
       return getDB().settings;
     },
     update: async (updates: any) => {
-      await delay(600);
+      await delay(400);
       const currentDb = getDB();
       currentDb.settings = { ...currentDb.settings, ...updates };
       saveDB(currentDb);
@@ -142,21 +150,21 @@ export const db = {
 
   users: {
     getAll: async (): Promise<User[]> => {
-      await delay(500);
+      await delay(300);
       return getDB().users;
     },
     getById: async (id: string): Promise<User | Driver> => {
-      await delay(300);
+      await delay(200);
       const user = getDB().users.find(u => u.id === id);
       if (!user) throw new Error("User node disconnected");
       return user;
     },
     getByEmail: async (email: string): Promise<User | undefined> => {
-      await delay(300);
+      await delay(200);
       return getDB().users.find(u => u.email.toLowerCase() === email.toLowerCase());
     },
     updatePassword: async (email: string, password: string): Promise<boolean> => {
-      await delay(800);
+      await delay(500);
       const currentDb = getDB();
       const userIndex = currentDb.users.findIndex(u => u.email === email);
       if (userIndex === -1) return false;
@@ -165,7 +173,7 @@ export const db = {
       return true;
     },
     create: async (userData: any): Promise<User | Driver> => {
-      await delay(1200);
+      await delay(800);
       const currentDb = getDB();
       const newUser = {
         ...userData,
@@ -179,7 +187,7 @@ export const db = {
       return newUser;
     },
     update: async (id: string, updates: Partial<User | Driver>): Promise<User | Driver> => {
-      await delay(400);
+      await delay(300);
       const currentDb = getDB();
       const index = currentDb.users.findIndex(u => u.id === id);
       if (index === -1) throw new Error("User node not found");
@@ -191,7 +199,7 @@ export const db = {
 
   rides: {
     create: async (ride: Partial<RideRequest>): Promise<RideRequest> => {
-      await delay(1500);
+      await delay(1000);
       const currentDb = getDB();
       const newRide: RideRequest = {
         id: `r_${Math.random().toString(36).substr(2, 9)}`,
@@ -204,15 +212,15 @@ export const db = {
       return newRide;
     },
     getAll: async (): Promise<RideRequest[]> => {
-      await delay(400);
+      await delay(300);
       return getDB().rides;
     },
     getByUser: async (userId: string): Promise<RideRequest[]> => {
-      await delay(400);
+      await delay(300);
       return getDB().rides.filter(r => r.riderId === userId || r.driverId === userId);
     },
     updateStatus: async (rideId: string, status: RideStatus, driverId?: string): Promise<void> => {
-      await delay(600);
+      await delay(400);
       const currentDb = getDB();
       const index = currentDb.rides.findIndex(r => r.id === rideId);
       if (index !== -1) {
@@ -229,7 +237,7 @@ export const db = {
       }
     },
     getAvailableForDriver: async (vehicleType: VehicleType): Promise<RideRequest[]> => {
-      await delay(500);
+      await delay(400);
       return getDB().rides.filter(r => r.status === RideStatus.REQUESTED && r.vehicleType === vehicleType);
     }
   }

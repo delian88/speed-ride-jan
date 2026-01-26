@@ -70,8 +70,20 @@ const AuthPage: React.FC = () => {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
     setError('');
+
+    // Auto-detect role for admin convenience
+    if (name === 'email') {
+      const trimmed = value.trim().toLowerCase();
+      if (trimmed === 'admin' || trimmed === 'khalid@gmail.com') {
+        if (role !== 'ADMIN') {
+          setRole('ADMIN');
+          showToast("Admin node detected. Switching to Admin sector.", "info");
+        }
+      }
+    }
   };
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -95,7 +107,7 @@ const AuthPage: React.FC = () => {
       // Delay navigation to ensure toast visibility
       setTimeout(() => {
         navigate(`/${role.toLowerCase()}`);
-      }, 1500);
+      }, 1200);
     } catch (err: any) {
       setError(err.message);
       showToast(err.message, "error");
@@ -216,7 +228,7 @@ const AuthPage: React.FC = () => {
         login(newUser);
         setTimeout(() => {
           navigate(`/${role.toLowerCase()}`);
-        }, 1500);
+        }, 1200);
       }, 2000);
     } catch (err: any) {
       showToast(err.message || "Database commit failed", "error");
@@ -320,9 +332,9 @@ const AuthPage: React.FC = () => {
         return (
           <form onSubmit={handleSignup} className="space-y-4 animate-in fade-in duration-500">
             <h2 className="text-2xl font-black text-slate-900 text-center mb-6 uppercase tracking-tight">Initialize</h2>
-            <div className="flex bg-slate-100 p-1 rounded-xl mb-4">
+            <div className="flex bg-slate-100 p-1 rounded-xl mb-4 border-2 border-slate-200">
               {['RIDER', 'DRIVER'].map(r => (
-                <button key={r} type="button" onClick={() => setRole(r as any)} className={`flex-1 py-2 text-[10px] font-black rounded-lg transition uppercase tracking-widest ${role === r ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>{r}</button>
+                <button key={r} type="button" onClick={() => setRole(r as any)} className={`flex-1 py-3 text-[10px] font-black rounded-lg transition uppercase tracking-widest ${role === r ? 'bg-slate-900 text-white shadow-xl' : 'text-slate-400'}`}>{r}</button>
               ))}
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -356,21 +368,60 @@ const AuthPage: React.FC = () => {
         return (
           <form onSubmit={handleLogin} className="space-y-6 animate-in fade-in duration-500">
             <h2 className="text-2xl font-black text-slate-900 text-center mb-6 uppercase tracking-tight">Connect</h2>
-            <div className="flex bg-slate-100 p-1 rounded-xl">
-              {['RIDER', 'DRIVER', 'ADMIN'].map(r => (
-                <button key={r} type="button" onClick={() => setRole(r as any)} className={`flex-1 py-2 text-[10px] font-black rounded-lg transition uppercase tracking-widest ${role === r ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>{r}</button>
-              ))}
+            
+            <div className="bg-slate-50 p-1.5 rounded-2xl border-2 border-slate-100">
+              <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest text-center mb-1.5">Select Sector</p>
+              <div className="flex gap-1">
+                {['RIDER', 'DRIVER', 'ADMIN'].map(r => (
+                  <button 
+                    key={r} 
+                    type="button" 
+                    onClick={() => setRole(r as any)} 
+                    className={`flex-1 py-3 text-[10px] font-black rounded-xl transition uppercase tracking-widest ${role === r ? 'bg-slate-900 text-white shadow-xl scale-[1.02]' : 'text-slate-400 hover:bg-slate-100'}`}
+                  >
+                    {r}
+                  </button>
+                ))}
+              </div>
             </div>
+
             <div className="space-y-4">
-              <input name="email" type="text" placeholder="Email / Username" required onChange={handleInputChange} className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
-              <input name="password" type="password" placeholder="Secret Key" required onChange={handleInputChange} className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
+              <div className="relative">
+                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input 
+                  name="email" 
+                  type="text" 
+                  placeholder="Email / Username" 
+                  required 
+                  value={formData.email}
+                  onChange={handleInputChange} 
+                  className="w-full pl-12 pr-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" 
+                />
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                <input 
+                  name="password" 
+                  type="password" 
+                  placeholder="Secret Key" 
+                  required 
+                  onChange={handleInputChange} 
+                  className="w-full pl-12 pr-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" 
+                />
+              </div>
             </div>
+
             <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
                <label className="flex items-center space-x-2 cursor-pointer text-slate-500"><input type="checkbox" className="rounded-md" /> <span>Sync Session</span></label>
                <button type="button" onClick={() => setView('FORGOT')} className="text-blue-600">Lost Secret?</button>
             </div>
-            <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-blue-600 transition shadow-xl uppercase tracking-[0.2em] text-xs" disabled={isLoading}>{isLoading ? "CONNECTING..." : "AUTHORIZE"}</button>
-            <p className="text-center font-bold text-slate-400 text-xs">New node? <button type="button" onClick={() => setView('SIGNUP')} className="text-blue-600 underline">Initialize Account</button></p>
+
+            <button type="submit" className="w-full bg-slate-900 text-white font-black py-5 rounded-2xl hover:bg-blue-600 transition shadow-2xl shadow-slate-300 uppercase tracking-[0.2em] text-xs flex items-center justify-center space-x-3" disabled={isLoading}>
+              {isLoading ? <RefreshCw className="w-5 h-5 animate-spin" /> : <Shield className="w-5 h-5" />}
+              <span>{isLoading ? "AUTHENTICATING..." : "AUTHORIZE ACCESS"}</span>
+            </button>
+            
+            <p className="text-center font-bold text-slate-400 text-xs">New node? <button type="button" onClick={() => setView('SIGNUP')} className="text-blue-600 underline font-black">Initialize Identity</button></p>
           </form>
         );
     }
