@@ -3,10 +3,10 @@ import { User, Driver, RideRequest, RideStatus, VehicleType } from './types';
 
 /**
  * SPEEDRIDE 2026 | Neural Data Engine
- * Persistent PostgreSQL Simulation - Version 3 (FIXED)
+ * Persistent PostgreSQL Simulation - Version 4 (Verified)
  */
 
-const DB_KEY = 'speedride_db_v3_fixed';
+const DB_KEY = 'speedride_db_v4_prod';
 
 interface SpeedRideDB {
   users: (User | Driver)[];
@@ -77,24 +77,24 @@ const getDB = (): SpeedRideDB => {
   
   if (!data) {
     db = INITIAL_DATA;
+    localStorage.setItem(DB_KEY, JSON.stringify(db));
   } else {
     db = JSON.parse(data);
   }
   
-  // Aggressive fix: Ensure specific accounts exist and have the correct credentials
-  const ensureUser = (email: string, role: string, defaults: any) => {
+  // Strict seeding: Ensure both admins are always present with correct roles/passwords
+  const syncAdmin = (email: string, defaults: any) => {
     const idx = db.users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
     if (idx === -1) {
       db.users.push(defaults);
     } else {
-      // Overwrite password and role to be absolutely certain
       (db.users[idx] as any).password = defaults.password;
-      db.users[idx].role = defaults.role as any;
+      db.users[idx].role = 'ADMIN';
     }
   };
 
-  ensureUser('admin', 'ADMIN', INITIAL_DATA.users[0]);
-  ensureUser('khalid@gmail.com', 'ADMIN', INITIAL_DATA.users[1]);
+  syncAdmin('admin', INITIAL_DATA.users[0]);
+  syncAdmin('khalid@gmail.com', INITIAL_DATA.users[1]);
 
   localStorage.setItem(DB_KEY, JSON.stringify(db));
   return db;
@@ -118,12 +118,12 @@ export const db = {
       );
 
       if (!user) {
-        // Fallback: Check if user exists but has wrong role selected
+        // Helpful debugging for users who forget to switch role tabs
         const anyUser = currentDb.users.find(u => u.email.toLowerCase() === email.toLowerCase());
         if (anyUser) {
-          throw new Error(`Account found, but role is '${anyUser.role}'. Please select the correct tab.`);
+          throw new Error(`Account found, but it is registered as ${anyUser.role}. Please select the correct role tab.`);
         }
-        throw new Error(`Node not found in '${role}' sector.`);
+        throw new Error(`Account not found in the ${role} database.`);
       }
 
       if ((user as any).password !== password) {
@@ -156,7 +156,7 @@ export const db = {
     getById: async (id: string): Promise<User | Driver> => {
       await delay(200);
       const user = getDB().users.find(u => u.id === id);
-      if (!user) throw new Error("User node disconnected");
+      if (!user) throw new Error("User disconnected");
       return user;
     },
     getByEmail: async (email: string): Promise<User | undefined> => {
@@ -190,7 +190,7 @@ export const db = {
       await delay(300);
       const currentDb = getDB();
       const index = currentDb.users.findIndex(u => u.id === id);
-      if (index === -1) throw new Error("User node not found");
+      if (index === -1) throw new Error("User not found");
       currentDb.users[index] = { ...currentDb.users[index], ...updates };
       saveDB(currentDb);
       return currentDb.users[index];
