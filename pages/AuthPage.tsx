@@ -88,14 +88,14 @@ const AuthPage: React.FC = () => {
         throw new Error("Missing credentials.");
       }
 
-      // Use the simulated auth login
-      const session = await db.auth.login(email, password, role);
+      // Unified login automatically finds the user and their role
+      const session = await db.auth.login(email, password);
       
       login(session);
       
-      // Delay navigation to ensure toast visibility
+      // Navigate based on the identified role
       setTimeout(() => {
-        navigate(`/${role.toLowerCase()}`);
+        navigate(`/${session.role.toLowerCase()}`);
       }, 1200);
     } catch (err: any) {
       setError(err.message);
@@ -357,20 +357,19 @@ const AuthPage: React.FC = () => {
         return (
           <form onSubmit={handleLogin} className="space-y-6 animate-in fade-in duration-500">
             <h2 className="text-2xl font-black text-slate-900 text-center mb-6 uppercase tracking-tight">Connect</h2>
-            <div className="flex bg-slate-100 p-1 rounded-xl">
-              {['RIDER', 'DRIVER', 'ADMIN'].map(r => (
-                <button key={r} type="button" onClick={() => setRole(r as any)} className={`flex-1 py-2 text-[10px] font-black rounded-lg transition uppercase tracking-widest ${role === r ? 'bg-white text-blue-600 shadow-sm' : 'text-slate-400'}`}>{r}</button>
-              ))}
-            </div>
+            
             <div className="space-y-4">
               <input name="email" type="text" placeholder="Email / Username" required onChange={handleInputChange} className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
               <input name="password" type="password" placeholder="Secret Key" required onChange={handleInputChange} className="w-full px-5 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
             </div>
+            
             <div className="flex justify-between text-[10px] font-black uppercase tracking-widest">
                <label className="flex items-center space-x-2 cursor-pointer text-slate-500"><input type="checkbox" className="rounded-md" /> <span>Sync Session</span></label>
                <button type="button" onClick={() => setView('FORGOT')} className="text-blue-600">Lost Secret?</button>
             </div>
+            
             <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-blue-600 transition shadow-xl uppercase tracking-[0.2em] text-xs" disabled={isLoading}>{isLoading ? "CONNECTING..." : "AUTHORIZE"}</button>
+            
             <p className="text-center font-bold text-slate-400 text-xs">New node? <button type="button" onClick={() => setView('SIGNUP')} className="text-blue-600 underline">Initialize Account</button></p>
           </form>
         );

@@ -3,10 +3,10 @@ import { User, Driver, RideRequest, RideStatus, VehicleType } from './types';
 
 /**
  * SPEEDRIDE 2026 | Neural Data Engine
- * Persistent PostgreSQL Simulation - Version 4 (Verified)
+ * Unified Authentication Logic - Version 5
  */
 
-const DB_KEY = 'speedride_db_v4_prod';
+const DB_KEY = 'speedride_db_v5_unified';
 
 interface SpeedRideDB {
   users: (User | Driver)[];
@@ -82,7 +82,7 @@ const getDB = (): SpeedRideDB => {
     db = JSON.parse(data);
   }
   
-  // Strict seeding: Ensure both admins are always present with correct roles/passwords
+  // Seed verification for khalid@gmail.com
   const syncAdmin = (email: string, defaults: any) => {
     const idx = db.users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
     if (idx === -1) {
@@ -108,26 +108,19 @@ const delay = (ms = 500) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const db = {
   auth: {
-    login: async (email: string, password: string, role: string) => {
+    login: async (email: string, password: string) => {
       await delay(800);
       const currentDb = getDB();
       
-      const user = currentDb.users.find(u => 
-        u.email.toLowerCase() === email.toLowerCase() && 
-        u.role === role
-      );
+      // Global search across all roles
+      const user = currentDb.users.find(u => u.email.toLowerCase() === email.toLowerCase());
 
       if (!user) {
-        // Helpful debugging for users who forget to switch role tabs
-        const anyUser = currentDb.users.find(u => u.email.toLowerCase() === email.toLowerCase());
-        if (anyUser) {
-          throw new Error(`Account found, but it is registered as ${anyUser.role}. Please select the correct role tab.`);
-        }
-        throw new Error(`Account not found in the ${role} database.`);
+        throw new Error("No account found with this email.");
       }
 
       if ((user as any).password !== password) {
-        throw new Error("Invalid secret key. Access denied.");
+        throw new Error("Incorrect password for this node.");
       }
       
       return { ...user, token: `sr_jwt_${Math.random().toString(36).substr(2)}` };
@@ -156,7 +149,7 @@ export const db = {
     getById: async (id: string): Promise<User | Driver> => {
       await delay(200);
       const user = getDB().users.find(u => u.id === id);
-      if (!user) throw new Error("User disconnected");
+      if (!user) throw new Error("Connection lost");
       return user;
     },
     getByEmail: async (email: string): Promise<User | undefined> => {
