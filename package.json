@@ -13,7 +13,8 @@
     "react-dom": "18.3.1",
     "react-router-dom": "6.26.0",
     "recharts": "2.12.7",
-    "lucide-react": "0.428.0"
+    "lucide-react": "0.428.0",
+    "@neondatabase/serverless": "0.9.4"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

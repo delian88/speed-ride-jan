@@ -26,6 +26,9 @@ export interface User {
   avatar: string;
   rating: number;
   balance: number;
+  // Added to align with database columns and support updates
+  isOnline?: boolean;
+  isVerified?: boolean;
 }
 
 export interface Driver extends User {

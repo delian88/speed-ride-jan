@@ -1,237 +1,275 @@
 
+import { neon } from '@neondatabase/serverless';
 import { User, Driver, RideRequest, RideStatus, VehicleType } from './types';
 
 /**
- * SPEEDRIDE 2026 | Neural Data Engine
- * Unified Authentication Logic - Version 5
+ * SPEEDRIDE 2026 | Hybrid Neural Data Engine
+ * Features: PostgreSQL (Neon) with LocalStorage Fallback
  */
 
-const DB_KEY = 'speedride_db_v5_unified';
+let sqlInstance: any = null;
+let isMock = false;
 
-interface SpeedRideDB {
-  users: (User | Driver)[];
-  rides: RideRequest[];
-  settings: {
-    baseFare: number;
-    pricePerKm: number;
-    commission: number;
-    maintenanceMode: boolean;
-  };
-}
-
-const INITIAL_DATA: SpeedRideDB = {
-  users: [
-    {
-      id: 'admin_01',
-      name: 'System Admin',
-      email: 'admin',
-      phone: '08000000000',
-      role: 'ADMIN',
-      avatar: 'https://i.pravatar.cc/150?u=admin',
-      rating: 5.0,
-      balance: 0,
-      isVerified: true,
-      password: 'admin123'
-    } as any,
-    {
-      id: 'admin_khalid',
-      name: 'Khalid Admin',
-      email: 'khalid@gmail.com',
-      phone: '08123456789',
-      role: 'ADMIN',
-      avatar: 'https://i.pravatar.cc/150?u=khalid',
-      rating: 5.0,
-      balance: 0,
-      isVerified: true,
-      password: 'khalid123'
-    } as any,
-    {
-      id: 'd1',
-      name: 'Sarah Miller',
-      email: 'driver@speedride.com',
-      phone: '+234 812 345 6789',
-      role: 'DRIVER',
-      avatar: 'https://i.pravatar.cc/150?u=sarah',
-      rating: 4.9,
-      balance: 124050.50,
-      vehicleType: VehicleType.PREMIUM,
-      vehicleModel: 'Tesla Model 3',
-      plateNumber: 'SR-777',
-      isOnline: true,
-      isVerified: true,
-      password: 'password'
-    } as any,
-  ],
-  rides: [],
-  settings: {
-    baseFare: 1200,
-    pricePerKm: 450,
-    commission: 15,
-    maintenanceMode: false,
-  }
+// --- Mock Engine (LocalStorage) ---
+const mockDb = {
+  users: [] as any[],
+  rides: [] as any[],
+  settings: { baseFare: 1200, pricePerKm: 450, commission: 15, maintenanceMode: false }
 };
 
-const getDB = (): SpeedRideDB => {
-  const data = localStorage.getItem(DB_KEY);
-  let db: SpeedRideDB;
-  
-  if (!data) {
-    db = INITIAL_DATA;
-    localStorage.setItem(DB_KEY, JSON.stringify(db));
+const loadMock = () => {
+  const saved = localStorage.getItem('speedride_local_db');
+  if (saved) {
+    const data = JSON.parse(saved);
+    mockDb.users = data.users || [];
+    mockDb.rides = data.rides || [];
+    mockDb.settings = data.settings || mockDb.settings;
   } else {
-    db = JSON.parse(data);
+    // Initial Seed for Mock
+    mockDb.users = [
+      { id: 'admin_01', name: 'System Admin', email: 'admin', phone: '08000000000', password: 'admin123', role: 'ADMIN', avatar: 'https://i.pravatar.cc/150?u=admin', is_verified: true, balance: 0, rating: 5.0 },
+      { id: 'd1', name: 'Sarah Miller', email: 'driver@speedride.com', phone: '+234 812 345 6789', password: 'password', role: 'DRIVER', avatar: 'https://i.pravatar.cc/150?u=sarah', rating: 4.9, balance: 124050.50, vehicle_type: 'PREMIUM', vehicle_model: 'Tesla Model 3', plate_number: 'SR-777', is_online: true, is_verified: true }
+    ];
+    saveMock();
   }
-  
-  // Seed verification for khalid@gmail.com
-  const syncAdmin = (email: string, defaults: any) => {
-    const idx = db.users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
-    if (idx === -1) {
-      db.users.push(defaults);
-    } else {
-      (db.users[idx] as any).password = defaults.password;
-      db.users[idx].role = 'ADMIN';
+};
+
+const saveMock = () => {
+  localStorage.setItem('speedride_local_db', JSON.stringify(mockDb));
+};
+
+// --- Postgres Logic ---
+const getSql = () => {
+  const url = process.env.DATABASE_URL;
+  if (!url) {
+    if (!isMock) {
+      console.warn("SPEEDRIDE: DATABASE_URL not found. Falling back to Persistent LocalStorage Engine.");
+      isMock = true;
+      loadMock();
     }
+    return null;
+  }
+  if (!sqlInstance) sqlInstance = neon(url);
+  return sqlInstance;
+};
+
+const mapUser = (u: any): User | Driver => {
+  if (!u) return u;
+  return {
+    ...u,
+    isOnline: u.is_online,
+    isVerified: u.is_verified,
+    balance: parseFloat(u.balance || 0),
+    rating: parseFloat(u.rating || 5),
+    vehicleType: u.vehicle_type,
+    vehicleModel: u.vehicle_model,
+    plateNumber: u.plate_number,
+    licenseDoc: u.license_doc,
+    ninDoc: u.nin_doc,
+    createdAt: u.created_at
+  } as any;
+};
+
+const mapRide = (r: any): RideRequest => {
+  if (!r) return r;
+  return {
+    ...r,
+    riderId: r.rider_id,
+    driverId: r.driver_id,
+    vehicleType: r.vehicle_type,
+    createdAt: r.created_at,
+    fare: parseFloat(r.fare || 0),
+    distance: parseFloat(r.distance || 0)
   };
-
-  syncAdmin('admin', INITIAL_DATA.users[0]);
-  syncAdmin('khalid@gmail.com', INITIAL_DATA.users[1]);
-
-  localStorage.setItem(DB_KEY, JSON.stringify(db));
-  return db;
 };
-
-const saveDB = (db: SpeedRideDB) => {
-  localStorage.setItem(DB_KEY, JSON.stringify(db));
-};
-
-const delay = (ms = 500) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const db = {
+  isLocal: () => isMock,
+  
+  init: async () => {
+    const sql = getSql();
+    if (!sql) return; // Mock loaded in getSql
+    
+    try {
+      await sql`CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, name TEXT, email TEXT UNIQUE, phone TEXT, password TEXT, role TEXT, avatar TEXT, rating DECIMAL, balance DECIMAL, is_online BOOLEAN, is_verified BOOLEAN, vehicle_type TEXT, vehicle_model TEXT, plate_number TEXT, license_doc TEXT, nin_doc TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`;
+      await sql`CREATE TABLE IF NOT EXISTS rides (id TEXT PRIMARY KEY, rider_id TEXT, driver_id TEXT, pickup TEXT, dropoff TEXT, fare DECIMAL, distance DECIMAL, status TEXT, vehicle_type TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`;
+      await sql`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value JSONB)`;
+      
+      const count = await sql`SELECT count(*) FROM users`;
+      if (parseInt(count[0].count) === 0) {
+        await sql`INSERT INTO users (id, name, email, phone, password, role, is_verified) VALUES ('admin_01', 'Admin', 'admin', '080', 'admin123', 'ADMIN', true)`;
+        await sql`INSERT INTO settings (key, value) VALUES ('global_config', '{"baseFare": 1200, "pricePerKm": 450, "commission": 15}'::jsonb)`;
+      }
+    } catch (e) {
+      console.error("DB Init Failed, using mock.", e);
+      isMock = true;
+      loadMock();
+    }
+  },
+
   auth: {
     login: async (email: string, password: string) => {
-      await delay(800);
-      const currentDb = getDB();
-      
-      // Global search across all roles
-      const user = currentDb.users.find(u => u.email.toLowerCase() === email.toLowerCase());
-
-      if (!user) {
-        throw new Error("No account found with this email.");
+      if (isMock) {
+        const u = mockDb.users.find(x => x.email.toLowerCase() === email.toLowerCase());
+        if (!u) throw new Error("Account not found.");
+        if (u.password !== password) throw new Error("Invalid password.");
+        return { ...mapUser(u), token: 'mock_token_' + Math.random() };
       }
+      const sql = getSql();
+      const res = await sql`SELECT * FROM users WHERE LOWER(email) = LOWER(${email})`;
+      if (!res[0]) throw new Error("Account not found.");
+      if (res[0].password !== password) throw new Error("Invalid password.");
+      return { ...mapUser(res[0]), token: 'pg_token_' + Math.random() };
+    }
+  },
 
-      if ((user as any).password !== password) {
-        throw new Error("Incorrect password for this node.");
+  users: {
+    getAll: async () => {
+      if (isMock) return mockDb.users.map(mapUser);
+      const sql = getSql();
+      const res = await sql`SELECT * FROM users`;
+      return res.map(mapUser);
+    },
+    getById: async (id: string) => {
+      if (isMock) return mapUser(mockDb.users.find(u => u.id === id));
+      const sql = getSql();
+      const res = await sql`SELECT * FROM users WHERE id = ${id}`;
+      return mapUser(res[0]);
+    },
+    getByEmail: async (email: string) => {
+      if (isMock) return mapUser(mockDb.users.find(u => u.email === email));
+      const sql = getSql();
+      const res = await sql`SELECT * FROM users WHERE LOWER(email) = LOWER(${email})`;
+      return mapUser(res[0]);
+    },
+    update: async (id: string, updates: any) => {
+      if (isMock) {
+        const idx = mockDb.users.findIndex(u => u.id === id);
+        if (idx > -1) {
+          const mappedUpdates = {
+            ...updates,
+            is_online: updates.isOnline !== undefined ? updates.isOnline : mockDb.users[idx].is_online,
+            is_verified: updates.isVerified !== undefined ? updates.isVerified : mockDb.users[idx].is_verified
+          };
+          mockDb.users[idx] = { ...mockDb.users[idx], ...mappedUpdates };
+          saveMock();
+        }
+        return mapUser(mockDb.users[idx]);
       }
+      const sql = getSql();
+      const current = await db.users.getById(id);
+      const next = { ...current, ...updates };
+      await sql`UPDATE users SET name=${next.name}, phone=${next.phone}, is_online=${next.isOnline || false}, is_verified=${next.isVerified || false}, balance=${next.balance} WHERE id=${id}`;
+      return next as any;
+    },
+    // Fix: Added missing updatePassword method to support password recovery flow
+    updatePassword: async (email: string, password: string) => {
+      if (isMock) {
+        const u = mockDb.users.find(x => x.email.toLowerCase() === email.toLowerCase());
+        if (!u) return false;
+        u.password = password;
+        saveMock();
+        return true;
+      }
+      const sql = getSql();
+      await sql`UPDATE users SET password = ${password} WHERE LOWER(email) = LOWER(${email})`;
+      return true;
+    },
+    create: async (data: any) => {
+      const id = 'u_' + Math.random().toString(36).substr(2, 9);
+      const newUser = { 
+        ...data, 
+        id, 
+        balance: data.role === 'RIDER' ? 5000 : 0, 
+        rating: 5.0,
+        is_online: data.isOnline || false,
+        is_verified: data.isVerified || false
+      };
+      if (isMock) {
+        mockDb.users.push(newUser);
+        saveMock();
+        return { ...mapUser(newUser), token: 'mock_t' };
+      }
+      const sql = getSql();
+      await sql`INSERT INTO users (id, name, email, phone, password, role, avatar, balance, vehicle_type, vehicle_model, plate_number, is_online, is_verified, license_doc, nin_doc) VALUES (${id}, ${data.name}, ${data.email}, ${data.phone}, ${data.password}, ${data.role}, ${data.avatar}, ${newUser.balance}, ${data.vehicleType || null}, ${data.vehicleModel || null}, ${data.plateNumber || null}, ${newUser.is_online}, ${newUser.is_verified}, ${data.licenseDoc || null}, ${data.ninDoc || null})`;
+      return { ...mapUser(newUser), token: 'pg_t' };
+    }
+  },
+
+  rides: {
+    create: async (ride: any) => {
+      const id = 'r_' + Math.random().toString(36).substr(2, 9);
+      const newRide = { ...ride, id, status: RideStatus.REQUESTED, created_at: new Date().toISOString() };
+      if (isMock) {
+        mockDb.rides.push(newRide);
+        const rider = mockDb.users.find(u => u.id === ride.riderId);
+        if (rider) rider.balance -= ride.fare;
+        saveMock();
+        return mapRide(newRide);
+      }
+      const sql = getSql();
+      await sql`INSERT INTO rides (id, rider_id, pickup, dropoff, fare, distance, status, vehicle_type) VALUES (${id}, ${ride.riderId}, ${ride.pickup}, ${ride.dropoff}, ${ride.fare}, ${ride.distance}, ${newRide.status}, ${ride.vehicleType})`;
+      await sql`UPDATE users SET balance = balance - ${ride.fare} WHERE id = ${ride.riderId}`;
+      return mapRide(newRide);
+    },
+    getAll: async () => {
+      if (isMock) return mockDb.rides.map(mapRide);
+      const sql = getSql();
+      const res = await sql`SELECT * FROM rides`;
+      return res.map(mapRide);
+    },
+    getByUser: async (uid: string) => {
+      if (isMock) return mockDb.rides.filter(r => r.rider_id === uid || r.driver_id === uid).map(mapRide);
+      const sql = getSql();
+      const res = await sql`SELECT * FROM rides WHERE rider_id = ${uid} OR driver_id = ${uid}`;
+      return res.map(mapRide);
+    },
+    getAvailableForDriver: async (vt: string) => {
+      if (isMock) return mockDb.rides.filter(r => r.status === RideStatus.REQUESTED && r.vehicle_type === vt).map(mapRide);
+      const sql = getSql();
+      const res = await sql`SELECT * FROM rides WHERE status = ${RideStatus.REQUESTED} AND vehicle_type = ${vt}`;
+      return res.map(mapRide);
+    },
+    updateStatus: async (rid: string, status: string, did?: string) => {
+      if (isMock) {
+        const ride = mockDb.rides.find(r => r.id === rid);
+        if (ride) {
+          ride.status = status;
+          if (did) ride.driver_id = did;
+          if (status === RideStatus.COMPLETED && ride.driver_id) {
+            const driver = mockDb.users.find(u => u.id === ride.driver_id);
+            if (driver) driver.balance += (ride.fare * 0.8);
+          }
+          saveMock();
+        }
+        return mapRide(ride);
+      }
+      const sql = getSql();
+      if (did) await sql`UPDATE rides SET status=${status}, driver_id=${did} WHERE id=${rid}`;
+      else await sql`UPDATE rides SET status=${status} WHERE id=${rid}`;
       
-      return { ...user, token: `sr_jwt_${Math.random().toString(36).substr(2)}` };
+      if (status === RideStatus.COMPLETED) {
+        const rideRes = await sql`SELECT * FROM rides WHERE id = ${rid}`;
+        const r = rideRes[0];
+        if (r && r.driver_id) await sql`UPDATE users SET balance = balance + ${parseFloat(r.fare) * 0.8} WHERE id = ${r.driver_id}`;
+      }
+      const final = await sql`SELECT * FROM rides WHERE id = ${rid}`;
+      return mapRide(final[0]);
     }
   },
 
   settings: {
     get: async () => {
-      await delay(200);
-      return getDB().settings;
+      if (isMock) return mockDb.settings;
+      const sql = getSql();
+      const res = await sql`SELECT value FROM settings WHERE key = 'global_config'`;
+      return res[0]?.value || mockDb.settings;
     },
-    update: async (updates: any) => {
-      await delay(400);
-      const currentDb = getDB();
-      currentDb.settings = { ...currentDb.settings, ...updates };
-      saveDB(currentDb);
-      return currentDb.settings;
-    }
-  },
-
-  users: {
-    getAll: async (): Promise<User[]> => {
-      await delay(300);
-      return getDB().users;
-    },
-    getById: async (id: string): Promise<User | Driver> => {
-      await delay(200);
-      const user = getDB().users.find(u => u.id === id);
-      if (!user) throw new Error("Connection lost");
-      return user;
-    },
-    getByEmail: async (email: string): Promise<User | undefined> => {
-      await delay(200);
-      return getDB().users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    },
-    updatePassword: async (email: string, password: string): Promise<boolean> => {
-      await delay(500);
-      const currentDb = getDB();
-      const userIndex = currentDb.users.findIndex(u => u.email === email);
-      if (userIndex === -1) return false;
-      (currentDb.users[userIndex] as any).password = password;
-      saveDB(currentDb);
-      return true;
-    },
-    create: async (userData: any): Promise<User | Driver> => {
-      await delay(800);
-      const currentDb = getDB();
-      const newUser = {
-        ...userData,
-        id: `u_${Math.random().toString(36).substr(2, 9)}`,
-        rating: 5.0,
-        balance: userData.role === 'RIDER' ? 5000 : 0,
-        token: `sr_jwt_${Math.random().toString(36).substr(2)}`
-      };
-      currentDb.users.push(newUser);
-      saveDB(currentDb);
-      return newUser;
-    },
-    update: async (id: string, updates: Partial<User | Driver>): Promise<User | Driver> => {
-      await delay(300);
-      const currentDb = getDB();
-      const index = currentDb.users.findIndex(u => u.id === id);
-      if (index === -1) throw new Error("User not found");
-      currentDb.users[index] = { ...currentDb.users[index], ...updates };
-      saveDB(currentDb);
-      return currentDb.users[index];
-    }
-  },
-
-  rides: {
-    create: async (ride: Partial<RideRequest>): Promise<RideRequest> => {
-      await delay(1000);
-      const currentDb = getDB();
-      const newRide: RideRequest = {
-        id: `r_${Math.random().toString(36).substr(2, 9)}`,
-        status: RideStatus.REQUESTED,
-        createdAt: new Date().toISOString(),
-        ...ride
-      } as RideRequest;
-      currentDb.rides.push(newRide);
-      saveDB(currentDb);
-      return newRide;
-    },
-    getAll: async (): Promise<RideRequest[]> => {
-      await delay(300);
-      return getDB().rides;
-    },
-    getByUser: async (userId: string): Promise<RideRequest[]> => {
-      await delay(300);
-      return getDB().rides.filter(r => r.riderId === userId || r.driverId === userId);
-    },
-    updateStatus: async (rideId: string, status: RideStatus, driverId?: string): Promise<void> => {
-      await delay(400);
-      const currentDb = getDB();
-      const index = currentDb.rides.findIndex(r => r.id === rideId);
-      if (index !== -1) {
-        currentDb.rides[index].status = status;
-        if (driverId) currentDb.rides[index].driverId = driverId;
-        if (status === RideStatus.COMPLETED) {
-          const ride = currentDb.rides[index];
-          const riderIndex = currentDb.users.findIndex(u => u.id === ride.riderId);
-          const driverIndex = currentDb.users.findIndex(u => u.id === ride.driverId);
-          if (riderIndex !== -1) currentDb.users[riderIndex].balance -= ride.fare;
-          if (driverIndex !== -1) currentDb.users[driverIndex].balance += (ride.fare * 0.8);
-        }
-        saveDB(currentDb);
-      }
-    },
-    getAvailableForDriver: async (vehicleType: VehicleType): Promise<RideRequest[]> => {
-      await delay(400);
-      return getDB().rides.filter(r => r.status === RideStatus.REQUESTED && r.vehicleType === vehicleType);
+    update: async (v: any) => {
+      if (isMock) { mockDb.settings = v; saveMock(); return v; }
+      const sql = getSql();
+      await sql`UPDATE settings SET value = ${JSON.stringify(v)}::jsonb WHERE key = 'global_config'`;
+      return v;
     }
   }
 };
