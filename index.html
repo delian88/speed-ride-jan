@@ -8,6 +8,18 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://smtpjs.com/v3/smtp.js"></script>
     <!-- Google Maps API with fallback handling -->
+    <script>
+        // Safety Mock: Prevents the app from crashing if the Google Maps script fails or the key is invalid
+        window.google = window.google || {
+            maps: {
+                importLibrary: () => Promise.resolve(),
+                places: { Autocomplete: function() { return { addListener: () => {} }; } },
+                Map: function() { return { setCenter: () => {}, setZoom: () => {} }; },
+                Marker: function() { return { setMap: () => {} }; },
+                LatLng: function(lat, lng) { return { lat, lng }; }
+            }
+        };
+    </script>
     <script async defer src="https://maps.googleapis.com/maps/api/js?key=YOUR_GOOGLE_MAPS_API_KEY&libraries=places"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
