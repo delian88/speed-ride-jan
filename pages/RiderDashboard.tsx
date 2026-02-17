@@ -3,16 +3,123 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Routes, Route, NavLink, useNavigate } from 'react-router-dom';
 import { 
   MapPin, Navigation, History, Wallet, LogOut, Car, Zap, CheckCircle, 
-  ChevronRight, Search, Locate, Users, Clock, Shield, Bell, ChevronDown, Menu, ChevronUp, Loader2
+  ChevronRight, Search, Locate, Users, Clock, Shield, Bell, ChevronDown, Menu, ChevronUp, Loader2, Plus, X, CreditCard, DollarSign
 } from 'lucide-react';
 import { useApp } from '../App';
 import { RideStatus, VehicleType, RideRequest } from '../types';
 import { db } from '../database';
 
+// Replace with your BudPay Public Key from Dashboard
+const BUDPAY_PUBLIC_KEY = "pk_test_j6j1h6h1h6h1h6h1h6h1h6h1h6h1"; 
+
 const MINNA_COORDS = { lat: 9.6139, lng: 6.5569 };
 
-const RiderExplore: React.FC = () => {
-  const { currentUser, refreshUser } = useApp();
+const TopUpModal: React.FC<{ isOpen: boolean, onClose: () => void, onFunded: () => void }> = ({ isOpen, onClose, onFunded }) => {
+  const { currentUser, showToast } = useApp();
+  const [amount, setAmount] = useState('');
+  const [isFunding, setIsFunding] = useState(false);
+
+  const handleFundWithBudPay = async () => {
+    const val = parseFloat(amount);
+    if (!val || val < 100) {
+      showToast("Minimum top-up is ₦100", "error");
+      return;
+    }
+
+    setIsFunding(true);
+
+    try {
+      // BudPay Checkout Initialization
+      const reference = `SR-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+      
+      const checkout = (window as any).BudPayCheckout({
+        key: BUDPAY_PUBLIC_KEY,
+        email: currentUser?.email,
+        amount: val,
+        currency: "NGN",
+        reference: reference,
+        firstName: currentUser?.name.split(' ')[0] || "User",
+        lastName: currentUser?.name.split(' ')[1] || "SpeedRide",
+        metadata: {
+          user_id: currentUser?.id,
+          purpose: "Wallet Funding"
+        },
+        callback: async (response: any) => {
+          // On successful payment signal from BudPay
+          if (response.status === 'success') {
+            try {
+              await db.users.fundWallet(currentUser!.id, val);
+              showToast(`₦${val.toLocaleString()} successfully provisioned to your wallet`, "success");
+              onFunded();
+              onClose();
+            } catch (e) {
+              showToast("System failed to update balance. Contact support with ref: " + reference, "error");
+            }
+          } else {
+            showToast("Payment was not successful", "error");
+          }
+          setIsFunding(false);
+        },
+        onClose: () => {
+          showToast("Payment window closed", "info");
+          setIsFunding(false);
+        }
+      });
+    } catch (e) {
+      showToast("Failed to initialize gateway", "error");
+      setIsFunding(false);
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 animate-in fade-in duration-300">
+      <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
+      <div className="bg-white w-full max-w-md rounded-[40px] shadow-2xl relative z-10 p-10 animate-in zoom-in-95 duration-300 border border-white">
+        <button onClick={onClose} className="absolute right-6 top-6 p-2 bg-slate-50 rounded-full text-slate-400 hover:text-slate-900 transition"><X className="w-5 h-5" /></button>
+        <div className="text-center space-y-4 mb-10">
+           <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-3xl flex items-center justify-center mx-auto shadow-sm"><CreditCard className="w-8 h-8" /></div>
+           <h3 className="text-2xl font-black text-slate-900 uppercase tracking-tight">Fund via BudPay</h3>
+           <p className="text-xs font-bold text-slate-500 uppercase tracking-widest leading-relaxed">Secure Multi-Channel Payment <br/> via SpeedRide Ledger</p>
+        </div>
+
+        <div className="space-y-6">
+           <div className="relative group">
+              <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-slate-300 group-focus-within:text-blue-600">₦</span>
+              <input 
+                type="number" value={amount} onChange={e => setAmount(e.target.value)} 
+                placeholder="0.00" 
+                className="w-full bg-slate-50 border border-slate-100 rounded-[28px] py-6 pl-12 pr-6 text-2xl font-black outline-none focus:ring-4 focus:ring-blue-500/5 transition"
+              />
+           </div>
+
+           <div className="grid grid-cols-3 gap-3">
+              {[2000, 5000, 10000].map(val => (
+                <button key={val} onClick={() => setAmount(val.toString())} className="py-3 bg-slate-50 rounded-2xl font-black text-[10px] uppercase tracking-widest text-slate-400 hover:bg-blue-600 hover:text-white transition shadow-sm">
+                  + ₦{val.toLocaleString()}
+                </button>
+              ))}
+           </div>
+
+           <button 
+             disabled={isFunding} onClick={handleFundWithBudPay}
+             className="w-full py-6 bg-slate-900 text-white rounded-[24px] font-black text-xs uppercase tracking-widest flex items-center justify-center space-x-3 hover:bg-blue-600 transition shadow-2xl shadow-blue-500/20 active:scale-95 disabled:opacity-50 disabled:scale-100"
+           >
+             {isFunding ? <Loader2 className="w-5 h-5 animate-spin" /> : <><Zap className="w-5 h-5 text-yellow-400" /><span>Initialize Payment</span></>}
+           </button>
+           
+           <p className="text-[9px] text-center font-bold text-slate-400 uppercase tracking-widest">
+             Payments processed securely by BudPay Infrastructure
+           </p>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const RiderExplore: React.FC<{ onOpenTopUp: () => void }> = ({ onOpenTopUp }) => {
+  const { currentUser, refreshUser, showToast } = useApp();
   const [isFormVisible, setIsFormVisible] = useState(true);
   const [pickup, setPickup] = useState('Abuja Tech Hub, Wuse 2');
   const [dropoff, setDropoff] = useState('Nnamdi Azikiwe Airport');
@@ -31,7 +138,8 @@ const RiderExplore: React.FC = () => {
     try {
       const fare = calculateFare(selectedType);
       if (currentUser.balance < fare) {
-        alert("Insufficient Balance. Please top up your wallet.");
+        showToast("Insufficient Balance. Fund your wallet to proceed.", "error");
+        onOpenTopUp();
         setIsBooking(false);
         return;
       }
@@ -45,6 +153,9 @@ const RiderExplore: React.FC = () => {
         distance: 12.5,
       });
       setActiveRide(ride);
+      showToast("Journey initiated. Searching fleet...", "success");
+    } catch (e: any) {
+      showToast(e.message, "error");
     } finally {
       setIsBooking(false);
     }
@@ -95,7 +206,24 @@ const RiderExplore: React.FC = () => {
           </div>
         ) : (
           <div className="space-y-8">
-            <h2 className="text-3xl font-black text-slate-900 tracking-tight">Request a Ride</h2>
+            <div className="flex justify-between items-end">
+               <h2 className="text-3xl font-black text-slate-900 tracking-tight">Request a Ride</h2>
+               <div className="flex items-center space-x-2 text-blue-600 mb-1">
+                  <Shield className="w-4 h-4" />
+                  <span className="text-[9px] font-black uppercase tracking-widest">SpeedSafe Protected</span>
+               </div>
+            </div>
+            
+            {currentUser?.balance === 0 && (
+               <div className="bg-amber-50 border border-amber-100 p-6 rounded-[32px] flex items-start space-x-4 animate-pulse">
+                  <div className="p-3 bg-amber-500 text-white rounded-2xl shadow-lg"><Wallet className="w-5 h-5" /></div>
+                  <div>
+                    <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Empty Wallet</p>
+                    <p className="text-xs font-bold text-slate-600 leading-relaxed">Fund your account to start requesting rides from the SpeedRide fleet.</p>
+                  </div>
+               </div>
+            )}
+
             <div className="space-y-4">
               <div className="relative group">
                  <MapPin className="absolute left-5 top-1/2 -translate-y-1/2 text-blue-600 w-5 h-5 group-focus-within:scale-110 transition" />
@@ -128,7 +256,6 @@ const RiderExplore: React.FC = () => {
         <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1524661135-423995f22d0b?auto=format&fit=crop&w=1600&q=80')] bg-cover opacity-60 grayscale-[0.5]" />
         <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 to-transparent" />
         
-        {/* Radar Scanner Overlay */}
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] rounded-full border border-blue-500/20 pointer-events-none">
            <div className="radar-scanner" />
         </div>
@@ -138,11 +265,14 @@ const RiderExplore: React.FC = () => {
 };
 
 const RiderDashboard: React.FC = () => {
-  const { logout, currentUser } = useApp();
+  const { logout, currentUser, refreshUser } = useApp();
   const [isNavOpen, setIsNavOpen] = useState(false);
+  const [isTopUpOpen, setIsTopUpOpen] = useState(false);
 
   return (
     <div className="flex flex-col h-screen bg-white">
+      <TopUpModal isOpen={isTopUpOpen} onClose={() => setIsTopUpOpen(false)} onFunded={refreshUser} />
+
       <header className="h-20 bg-slate-900 text-white flex items-center justify-between px-6 md:px-10 z-50 shrink-0">
         <div className="flex items-center space-x-6">
           <button onClick={() => setIsNavOpen(!isNavOpen)} className="lg:hidden p-2 text-white/60 hover:text-white transition"><Menu className="w-6 h-6" /></button>
@@ -155,8 +285,15 @@ const RiderDashboard: React.FC = () => {
         <div className="flex items-center space-x-6">
            <div className="text-right hidden sm:block">
               <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest opacity-60">Neural Wallet</p>
-              <p className="text-xl font-black text-white">₦{currentUser?.balance.toLocaleString()}</p>
+              <p className={`text-xl font-black ${currentUser?.balance === 0 ? 'text-amber-400' : 'text-white'}`}>₦{currentUser?.balance.toLocaleString()}</p>
            </div>
+           <button 
+             onClick={() => setIsTopUpOpen(true)}
+             className="bg-blue-600 text-white p-2.5 rounded-2xl hover:scale-105 active:scale-95 transition shadow-lg shadow-blue-500/20 flex items-center space-x-2"
+           >
+             <Plus className="w-5 h-5" />
+             <span className="hidden md:block text-[10px] font-black uppercase tracking-widest">Top Up</span>
+           </button>
            <div className="flex items-center space-x-3 border-l border-white/10 pl-6">
               <img src={currentUser?.avatar} className="w-11 h-11 rounded-2xl object-cover ring-2 ring-white/10 shadow-xl" />
               <button onClick={logout} className="p-3 bg-white/5 rounded-2xl hover:bg-red-500/20 hover:text-red-400 transition"><LogOut className="w-5 h-5" /></button>
@@ -166,7 +303,7 @@ const RiderDashboard: React.FC = () => {
 
       <div className="flex-1 overflow-hidden">
         <Routes>
-          <Route index element={<RiderExplore />} />
+          <Route index element={<RiderExplore onOpenTopUp={() => setIsTopUpOpen(true)} />} />
           <Route path="*" element={<div className="p-20 text-center font-black text-slate-300">Section Provisioning...</div>} />
         </Routes>
       </div>

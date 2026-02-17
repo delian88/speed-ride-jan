@@ -5,8 +5,8 @@ import { User, Driver, RideRequest, RideStatus, VehicleType } from './types';
 
 /**
  * SPEEDRIDE 2026 | Production-Grade Hybrid Data Engine
- * Infrastructure: PostgreSQL (Neon) with persistent LocalStorage Fallback
- * Security: Bcrypt Hashing Layer
+ * Architecture: Serverless PostgreSQL (Neon) with atomic transaction logic
+ * Security: Bcrypt Hashing + Parameterized SQL
  */
 
 const SALT_ROUNDS = 10;
@@ -16,10 +16,11 @@ let sqlInstance: any = null;
 let isMock = false;
 let connectionError: string | null = null;
 
-// --- Mock Engine (LocalStorage) ---
+// --- Mock Engine (LocalStorage Fallback) ---
 const mockDb = {
   users: [] as any[],
   rides: [] as any[],
+  transactions: [] as any[],
   settings: { baseFare: 1200, pricePerKm: 450, commission: 15, maintenanceMode: false }
 };
 
@@ -29,15 +30,15 @@ const loadMock = async () => {
     const data = JSON.parse(saved);
     mockDb.users = data.users || [];
     mockDb.rides = data.rides || [];
+    mockDb.transactions = data.transactions || [];
     mockDb.settings = data.settings || mockDb.settings;
   } else {
-    // Initial Seed for Mock with Hashed Passwords
     const adminHash = await bcrypt.hash('admin123', SALT_ROUNDS);
     const driverHash = await bcrypt.hash('password', SALT_ROUNDS);
 
     mockDb.users = [
       { id: 'admin_01', name: 'System Admin', email: 'admin', phone: '08000000000', password: adminHash, role: 'ADMIN', avatar: 'https://i.pravatar.cc/150?u=admin', is_verified: true, balance: 0, rating: 5.0 },
-      { id: 'd1', name: 'Sarah Miller', email: 'driver@speedride.com', phone: '+234 812 345 6789', password: driverHash, role: 'DRIVER', avatar: 'https://i.pravatar.cc/150?u=sarah', rating: 4.9, balance: 124050.50, vehicle_type: 'PREMIUM', vehicle_model: 'Tesla Model 3', plate_number: 'SR-777', is_online: true, is_verified: true }
+      { id: 'd1', name: 'Sarah Miller', email: 'driver@speedride.com', phone: '+234 812 345 6789', password: driverHash, role: 'DRIVER', avatar: 'https://i.pravatar.cc/150?u=sarah', rating: 4.9, balance: 0, vehicle_type: 'PREMIUM', vehicle_model: 'Tesla Model 3', plate_number: 'SR-777', is_online: true, is_verified: true }
     ];
     saveMock();
   }
@@ -47,14 +48,11 @@ const saveMock = () => {
   localStorage.setItem('speedride_local_db', JSON.stringify(mockDb));
 };
 
-// --- Postgres Logic ---
+// --- Postgres Initialization ---
 const getSql = () => {
   const url = process.env.DATABASE_URL || PRODUCTION_DB_URL;
   if (!url) {
-    if (!isMock) {
-      isMock = true;
-      loadMock();
-    }
+    if (!isMock) { isMock = true; loadMock(); }
     return null;
   }
   try {
@@ -68,9 +66,9 @@ const getSql = () => {
   }
 };
 
+// --- Data Mappers ---
 const mapUser = (u: any): User | Driver => {
   if (!u) return u;
-  // We strip the password field here for safety in the app layer
   const { password, ...safeUser } = u;
   return {
     ...safeUser,
@@ -100,6 +98,7 @@ const mapRide = (r: any): RideRequest => {
   };
 };
 
+// --- Production DB Interface ---
 export const db = {
   isLocal: () => isMock,
   getConnectionStatus: () => ({
@@ -114,6 +113,7 @@ export const db = {
     if (!sql) return;
     
     try {
+      // 1. Users Core
       await sql`
         CREATE TABLE IF NOT EXISTS users (
           id TEXT PRIMARY KEY, 
@@ -135,6 +135,7 @@ export const db = {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`;
       
+      // 2. Rides Telemetry
       await sql`
         CREATE TABLE IF NOT EXISTS rides (
           id TEXT PRIMARY KEY, 
@@ -148,7 +149,21 @@ export const db = {
           vehicle_type TEXT NOT NULL, 
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`;
+
+      // 3. Financial Ledger (Transactions)
+      await sql`
+        CREATE TABLE IF NOT EXISTS transactions (
+          id SERIAL PRIMARY KEY,
+          user_id TEXT REFERENCES users(id),
+          ride_id TEXT REFERENCES rides(id),
+          amount DECIMAL(15,2) NOT NULL,
+          type TEXT NOT NULL, -- 'CREDIT', 'DEBIT'
+          category TEXT NOT NULL, -- 'FARE', 'COMMISSION', 'TOPUP', 'WITHDRAWAL'
+          description TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`;
       
+      // 4. Platform Configuration
       await sql`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value JSONB)`;
       
       const count = await sql`SELECT count(*) FROM users`;
@@ -167,6 +182,7 @@ export const db = {
 
   auth: {
     login: async (email: string, passwordInput: string) => {
+      const sql = getSql();
       if (isMock) {
         const u = mockDb.users.find(x => x.email.toLowerCase() === email.toLowerCase());
         if (!u) throw new Error("Account not found.");
@@ -174,7 +190,6 @@ export const db = {
         if (!isMatch) throw new Error("Invalid password.");
         return { ...mapUser(u), token: 'mock_token_' + Math.random() };
       }
-      const sql = getSql();
       const res = await sql`SELECT * FROM users WHERE LOWER(email) = LOWER(${email})`;
       if (!res[0]) throw new Error("Account not found.");
       const isMatch = await bcrypt.compare(passwordInput, res[0].password);
@@ -222,7 +237,6 @@ export const db = {
       const currentRes = await sql`SELECT * FROM users WHERE id = ${id}`;
       const current = currentRes[0];
       if (!current) throw new Error("User not found");
-      
       const next = { ...mapUser(current), ...updates };
       await sql`
         UPDATE users SET 
@@ -235,12 +249,12 @@ export const db = {
         WHERE id=${id}`;
       return next;
     },
-    updatePassword: async (email: string, password: string) => {
-      const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
+    updatePassword: async (email: string, newPasswordInput: string) => {
+      const hashedPassword = await bcrypt.hash(newPasswordInput, SALT_ROUNDS);
       if (isMock) {
-        const u = mockDb.users.find(x => x.email.toLowerCase() === email.toLowerCase());
-        if (!u) return false;
-        u.password = hashedPassword;
+        const idx = mockDb.users.findIndex(u => u.email.toLowerCase() === email.toLowerCase());
+        if (idx === -1) return false;
+        mockDb.users[idx].password = hashedPassword;
         saveMock();
         return true;
       }
@@ -251,22 +265,9 @@ export const db = {
     create: async (data: any) => {
       const id = 'u_' + Math.random().toString(36).substr(2, 9);
       const hashedPassword = await bcrypt.hash(data.password, SALT_ROUNDS);
-      const newUser = { 
-        ...data, 
-        id, 
-        password: hashedPassword,
-        balance: data.role === 'RIDER' ? 5000 : 0, 
-        rating: 5.0,
-        isOnline: data.isOnline || false,
-        isVerified: data.isVerified || false
-      };
-      
       if (isMock) {
-        mockDb.users.push({
-          ...newUser,
-          is_online: newUser.isOnline,
-          is_verified: newUser.isVerified
-        });
+        const newUser = { ...data, id, password: hashedPassword, balance: 0, rating: 5.0, is_online: data.isOnline || false, is_verified: data.isVerified || false };
+        mockDb.users.push(newUser);
         saveMock();
         return { ...mapUser(newUser), token: 'mock_t' };
       }
@@ -277,36 +278,53 @@ export const db = {
           vehicle_type, vehicle_model, plate_number, is_online, is_verified, license_doc, nin_doc
         ) VALUES (
           ${id}, ${data.name}, ${data.email}, ${data.phone}, ${hashedPassword}, ${data.role}, 
-          ${data.avatar}, ${newUser.balance}, ${data.vehicleType || null}, ${data.vehicleModel || null}, 
-          ${data.plateNumber || null}, ${newUser.isOnline}, ${newUser.isVerified}, 
+          ${data.avatar}, 0.0, ${data.vehicleType || null}, ${data.vehicleModel || null}, 
+          ${data.plateNumber || null}, ${data.isOnline || false}, ${data.isVerified || false}, 
           ${data.licenseDoc || null}, ${data.ninDoc || null}
         )`;
-      return { ...mapUser(newUser), token: 'pg_t' };
+      return { ...mapUser({ ...data, id, balance: 0 }), token: 'pg_t' };
+    },
+    fundWallet: async (userId: string, amount: number) => {
+      if (isMock) {
+        const user = mockDb.users.find(u => u.id === userId);
+        if (user) {
+          user.balance += amount;
+          mockDb.transactions.push({ user_id: userId, amount, type: 'CREDIT', category: 'TOPUP', description: 'Wallet Funding', created_at: new Date().toISOString() });
+          saveMock();
+          return mapUser(user);
+        }
+        throw new Error("User not found");
+      }
+      const sql = getSql();
+      await sql`UPDATE users SET balance = balance + ${amount} WHERE id = ${userId}`;
+      await sql`INSERT INTO transactions (user_id, amount, type, category, description) VALUES (${userId}, ${amount}, 'CREDIT', 'TOPUP', 'Wallet Funding')`;
+      const res = await sql`SELECT * FROM users WHERE id = ${userId}`;
+      return mapUser(res[0]);
     }
   },
 
   rides: {
     create: async (ride: any) => {
       const id = 'r_' + Math.random().toString(36).substr(2, 9);
-      const newRide = { 
-        ...ride, 
-        id, 
-        status: RideStatus.REQUESTED, 
-        created_at: new Date().toISOString(),
-        rider_id: ride.riderId,
-        vehicle_type: ride.vehicleType
-      };
+      const fare = parseFloat(ride.fare);
       if (isMock) {
-        mockDb.rides.push(newRide);
+        const newRide = { ...ride, id, status: RideStatus.REQUESTED, created_at: new Date().toISOString(), rider_id: ride.riderId, vehicle_type: ride.vehicleType };
         const rider = mockDb.users.find(u => u.id === ride.riderId);
-        if (rider) rider.balance -= ride.fare;
+        if (!rider || rider.balance < fare) throw new Error("Insufficient Balance");
+        mockDb.rides.push(newRide);
+        rider.balance -= fare;
+        mockDb.transactions.push({ user_id: rider.id, ride_id: id, amount: fare, type: 'DEBIT', category: 'FARE', description: `Ride Booking: ${id}`, created_at: new Date().toISOString() });
         saveMock();
         return mapRide(newRide);
       }
       const sql = getSql();
-      await sql`INSERT INTO rides (id, rider_id, pickup, dropoff, fare, distance, status, vehicle_type) VALUES (${id}, ${ride.riderId}, ${ride.pickup}, ${ride.dropoff}, ${ride.fare}, ${ride.distance}, ${newRide.status}, ${ride.vehicleType})`;
-      await sql`UPDATE users SET balance = balance - ${ride.fare} WHERE id = ${ride.riderId}`;
-      return mapRide(newRide);
+      const userRes = await sql`SELECT balance FROM users WHERE id = ${ride.riderId}`;
+      if (!userRes[0] || parseFloat(userRes[0].balance) < fare) throw new Error("Insufficient Balance");
+      
+      await sql`INSERT INTO rides (id, rider_id, pickup, dropoff, fare, distance, status, vehicle_type) VALUES (${id}, ${ride.riderId}, ${ride.pickup}, ${ride.dropoff}, ${fare}, ${ride.distance}, ${RideStatus.REQUESTED}, ${ride.vehicleType})`;
+      await sql`UPDATE users SET balance = balance - ${fare} WHERE id = ${ride.riderId}`;
+      await sql`INSERT INTO transactions (user_id, ride_id, amount, type, category, description) VALUES (${ride.riderId}, ${id}, ${fare}, 'DEBIT', 'FARE', ${`Ride Booking: ${id}`})`;
+      return mapRide({ ...ride, id, status: RideStatus.REQUESTED });
     },
     getAll: async () => {
       if (isMock) return mockDb.rides.map(mapRide);
@@ -327,30 +345,56 @@ export const db = {
       return res.map(mapRide);
     },
     updateStatus: async (rid: string, status: string, did?: string) => {
+      const sql = getSql();
+      const settings = await db.settings.get();
+      const commissionRate = settings.commission || 15;
+
       if (isMock) {
         const ride = mockDb.rides.find(r => r.id === rid);
         if (ride) {
           ride.status = status;
           if (did) ride.driver_id = did;
           if (status === RideStatus.COMPLETED && ride.driver_id) {
+            const fare = parseFloat(ride.fare);
+            const commission = fare * (commissionRate / 100);
+            const driverEarning = fare - commission;
             const driver = mockDb.users.find(u => u.id === ride.driver_id);
-            if (driver) driver.balance += (ride.fare * 0.8);
+            if (driver) {
+              driver.balance += driverEarning;
+              mockDb.transactions.push({ user_id: driver.id, ride_id: rid, amount: driverEarning, type: 'CREDIT', category: 'FARE', description: `Ride Completion: ${rid}`, created_at: new Date().toISOString() });
+            }
           }
           saveMock();
         }
         return mapRide(ride);
       }
-      const sql = getSql();
+
       if (did) await sql`UPDATE rides SET status=${status}, driver_id=${did} WHERE id=${rid}`;
       else await sql`UPDATE rides SET status=${status} WHERE id=${rid}`;
       
       if (status === RideStatus.COMPLETED) {
         const rideRes = await sql`SELECT * FROM rides WHERE id = ${rid}`;
         const r = rideRes[0];
-        if (r && r.driver_id) await sql`UPDATE users SET balance = balance + ${parseFloat(r.fare) * 0.8} WHERE id = ${r.driver_id}`;
+        if (r && r.driver_id) {
+          const fare = parseFloat(r.fare);
+          const commission = fare * (commissionRate / 100);
+          const driverEarning = fare - commission;
+          
+          await sql`UPDATE users SET balance = balance + ${driverEarning} WHERE id = ${r.driver_id}`;
+          await sql`INSERT INTO transactions (user_id, ride_id, amount, type, category, description) VALUES (${r.driver_id}, ${rid}, ${driverEarning}, 'CREDIT', 'FARE', ${`Ride Earning: ${rid}`})`;
+          await sql`INSERT INTO transactions (user_id, ride_id, amount, type, category, description) VALUES ('admin_01', ${rid}, ${commission}, 'CREDIT', 'COMMISSION', ${`Platform Fee: ${rid}`})`;
+        }
       }
       const final = await sql`SELECT * FROM rides WHERE id = ${rid}`;
       return mapRide(final[0]);
+    }
+  },
+
+  transactions: {
+    getForUser: async (uid: string) => {
+      if (isMock) return mockDb.transactions.filter(t => t.user_id === uid).reverse();
+      const sql = getSql();
+      return await sql`SELECT * FROM transactions WHERE user_id = ${uid} ORDER BY created_at DESC`;
     }
   },
 
@@ -364,7 +408,7 @@ export const db = {
     update: async (v: any) => {
       if (isMock) { mockDb.settings = v; saveMock(); return v; }
       const sql = getSql();
-      await sql`UPDATE settings SET value = ${JSON.stringify(v)}::jsonb WHERE key = 'global_config'`;
+      await sql`INSERT INTO settings (key, value) VALUES ('global_config', ${JSON.stringify(v)}) ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`;
       return v;
     }
   }
