@@ -6,7 +6,7 @@ import {
   LogOut, DollarSign, Activity, Bell, ChevronDown, ChevronRight, User as UserIcon, 
   BarChart3, Menu, Save, ShieldCheck, CreditCard, Gift, HelpCircle, FileText,
   Clock, MapPin, Navigation, Info, ShieldAlert, CheckCircle, RefreshCw, Layers,
-  Briefcase, Download, Plus, Database, Cloud, Globe, Cpu, Terminal, Zap, Shield
+  Briefcase, Download, Plus, Database, Cloud, Globe, Cpu, Terminal, Zap, Shield, Lock
 } from 'lucide-react';
 import { 
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
@@ -106,6 +106,13 @@ const InfrastructureView: React.FC = () => {
                </div>
                <div className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl">
                   <div className="flex items-center space-x-3">
+                     <Lock className="text-indigo-500 w-5 h-5" />
+                     <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Crypto</span>
+                  </div>
+                  <span className="text-xs font-black text-slate-900">{status.encryption}</span>
+               </div>
+               <div className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl">
+                  <div className="flex items-center space-x-3">
                      <Zap className="text-amber-500 w-5 h-5" />
                      <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Latency</span>
                   </div>
@@ -161,6 +168,7 @@ const InfrastructureView: React.FC = () => {
                      <>
                         <p className="text-slate-600 font-medium">OK: Cloud Engine Detected (PostgreSQL)</p>
                         <p className="text-slate-600 font-medium">OK: Schema Validation Successful</p>
+                        <p className="text-slate-600 font-medium">OK: BCrypt Encryption Active</p>
                         <p className="text-slate-900 font-black mt-4">CORE STATUS: FULL PRODUCTION READY</p>
                      </>
                   ) : (

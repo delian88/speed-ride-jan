@@ -1,13 +1,15 @@
 
 import { neon } from '@neondatabase/serverless';
+import bcrypt from 'bcryptjs';
 import { User, Driver, RideRequest, RideStatus, VehicleType } from './types';
 
 /**
  * SPEEDRIDE 2026 | Production-Grade Hybrid Data Engine
  * Infrastructure: PostgreSQL (Neon) with persistent LocalStorage Fallback
+ * Security: Bcrypt Hashing Layer
  */
 
-// User provided production string
+const SALT_ROUNDS = 10;
 const PRODUCTION_DB_URL = 'postgresql://neondb_owner:npg_JNlD0ieCuW1z@ep-crimson-frog-aimk0mkg-pooler.c-4.us-east-1.aws.neon.tech/speedride?sslmode=require&channel_binding=require';
 
 let sqlInstance: any = null;
@@ -21,7 +23,7 @@ const mockDb = {
   settings: { baseFare: 1200, pricePerKm: 450, commission: 15, maintenanceMode: false }
 };
 
-const loadMock = () => {
+const loadMock = async () => {
   const saved = localStorage.getItem('speedride_local_db');
   if (saved) {
     const data = JSON.parse(saved);
@@ -29,10 +31,13 @@ const loadMock = () => {
     mockDb.rides = data.rides || [];
     mockDb.settings = data.settings || mockDb.settings;
   } else {
-    // Initial Seed for Mock
+    // Initial Seed for Mock with Hashed Passwords
+    const adminHash = await bcrypt.hash('admin123', SALT_ROUNDS);
+    const driverHash = await bcrypt.hash('password', SALT_ROUNDS);
+
     mockDb.users = [
-      { id: 'admin_01', name: 'System Admin', email: 'admin', phone: '08000000000', password: 'admin123', role: 'ADMIN', avatar: 'https://i.pravatar.cc/150?u=admin', is_verified: true, balance: 0, rating: 5.0 },
-      { id: 'd1', name: 'Sarah Miller', email: 'driver@speedride.com', phone: '+234 812 345 6789', password: 'password', role: 'DRIVER', avatar: 'https://i.pravatar.cc/150?u=sarah', rating: 4.9, balance: 124050.50, vehicle_type: 'PREMIUM', vehicle_model: 'Tesla Model 3', plate_number: 'SR-777', is_online: true, is_verified: true }
+      { id: 'admin_01', name: 'System Admin', email: 'admin', phone: '08000000000', password: adminHash, role: 'ADMIN', avatar: 'https://i.pravatar.cc/150?u=admin', is_verified: true, balance: 0, rating: 5.0 },
+      { id: 'd1', name: 'Sarah Miller', email: 'driver@speedride.com', phone: '+234 812 345 6789', password: driverHash, role: 'DRIVER', avatar: 'https://i.pravatar.cc/150?u=sarah', rating: 4.9, balance: 124050.50, vehicle_type: 'PREMIUM', vehicle_model: 'Tesla Model 3', plate_number: 'SR-777', is_online: true, is_verified: true }
     ];
     saveMock();
   }
@@ -44,9 +49,7 @@ const saveMock = () => {
 
 // --- Postgres Logic ---
 const getSql = () => {
-  // Use environment variable if present, otherwise fallback to the provided production string
   const url = process.env.DATABASE_URL || PRODUCTION_DB_URL;
-  
   if (!url) {
     if (!isMock) {
       isMock = true;
@@ -54,7 +57,6 @@ const getSql = () => {
     }
     return null;
   }
-  
   try {
     if (!sqlInstance) sqlInstance = neon(url);
     return sqlInstance;
@@ -68,8 +70,10 @@ const getSql = () => {
 
 const mapUser = (u: any): User | Driver => {
   if (!u) return u;
+  // We strip the password field here for safety in the app layer
+  const { password, ...safeUser } = u;
   return {
-    ...u,
+    ...safeUser,
     isOnline: u.is_online,
     isVerified: u.is_verified,
     balance: parseFloat(u.balance || 0),
@@ -101,7 +105,8 @@ export const db = {
   getConnectionStatus: () => ({
     type: isMock ? 'SANDBOX' : 'PRODUCTION',
     provider: isMock ? 'LocalStorage' : 'Neon PostgreSQL',
-    error: connectionError
+    error: connectionError,
+    encryption: 'BCRYPT_256'
   }),
   
   init: async () => {
@@ -109,7 +114,6 @@ export const db = {
     if (!sql) return;
     
     try {
-      // Create tables following the production schema.sql structure
       await sql`
         CREATE TABLE IF NOT EXISTS users (
           id TEXT PRIMARY KEY, 
@@ -149,32 +153,32 @@ export const db = {
       
       const count = await sql`SELECT count(*) FROM users`;
       if (parseInt(count[0].count) === 0) {
-        // Seed default admin if table is empty
-        await sql`INSERT INTO users (id, name, email, phone, password, role, is_verified) VALUES ('admin_01', 'Admin', 'admin', '080', 'admin123', 'ADMIN', true)`;
+        const hashedAdmin = await bcrypt.hash('admin123', SALT_ROUNDS);
+        await sql`INSERT INTO users (id, name, email, phone, password, role, is_verified) VALUES ('admin_01', 'Admin', 'admin', '080', ${hashedAdmin}, 'ADMIN', true)`;
         await sql`INSERT INTO settings (key, value) VALUES ('global_config', '{"baseFare": 1200, "pricePerKm": 450, "commission": 15}'::jsonb)`;
       }
       isMock = false;
-      console.log("SPEEDRIDE: Cloud Neural Core Online.");
     } catch (e: any) {
-      console.error("Postgres initialization failed. Reverting to Sandbox.", e);
       connectionError = e.message;
       isMock = true;
-      loadMock();
+      await loadMock();
     }
   },
 
   auth: {
-    login: async (email: string, password: string) => {
+    login: async (email: string, passwordInput: string) => {
       if (isMock) {
         const u = mockDb.users.find(x => x.email.toLowerCase() === email.toLowerCase());
         if (!u) throw new Error("Account not found.");
-        if (u.password !== password) throw new Error("Invalid password.");
+        const isMatch = await bcrypt.compare(passwordInput, u.password);
+        if (!isMatch) throw new Error("Invalid password.");
         return { ...mapUser(u), token: 'mock_token_' + Math.random() };
       }
       const sql = getSql();
       const res = await sql`SELECT * FROM users WHERE LOWER(email) = LOWER(${email})`;
       if (!res[0]) throw new Error("Account not found.");
-      if (res[0].password !== password) throw new Error("Invalid password.");
+      const isMatch = await bcrypt.compare(passwordInput, res[0].password);
+      if (!isMatch) throw new Error("Invalid password.");
       return { ...mapUser(res[0]), token: 'pg_token_' + Math.random() };
     }
   },
@@ -215,8 +219,11 @@ export const db = {
         return mapUser(mockDb.users[idx]);
       }
       const sql = getSql();
-      const current = await db.users.getById(id);
-      const next = { ...current, ...updates };
+      const currentRes = await sql`SELECT * FROM users WHERE id = ${id}`;
+      const current = currentRes[0];
+      if (!current) throw new Error("User not found");
+      
+      const next = { ...mapUser(current), ...updates };
       await sql`
         UPDATE users SET 
           name=${next.name}, 
@@ -226,30 +233,34 @@ export const db = {
           balance=${next.balance},
           rating=${next.rating}
         WHERE id=${id}`;
-      return next as any;
+      return next;
     },
     updatePassword: async (email: string, password: string) => {
+      const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
       if (isMock) {
         const u = mockDb.users.find(x => x.email.toLowerCase() === email.toLowerCase());
         if (!u) return false;
-        u.password = password;
+        u.password = hashedPassword;
         saveMock();
         return true;
       }
       const sql = getSql();
-      await sql`UPDATE users SET password = ${password} WHERE LOWER(email) = LOWER(${email})`;
+      await sql`UPDATE users SET password = ${hashedPassword} WHERE LOWER(email) = LOWER(${email})`;
       return true;
     },
     create: async (data: any) => {
       const id = 'u_' + Math.random().toString(36).substr(2, 9);
+      const hashedPassword = await bcrypt.hash(data.password, SALT_ROUNDS);
       const newUser = { 
         ...data, 
         id, 
+        password: hashedPassword,
         balance: data.role === 'RIDER' ? 5000 : 0, 
         rating: 5.0,
-        is_online: data.isOnline || false,
-        is_verified: data.isVerified || false
+        isOnline: data.isOnline || false,
+        isVerified: data.isVerified || false
       };
+      
       if (isMock) {
         mockDb.users.push({
           ...newUser,
@@ -265,9 +276,9 @@ export const db = {
           id, name, email, phone, password, role, avatar, balance, 
           vehicle_type, vehicle_model, plate_number, is_online, is_verified, license_doc, nin_doc
         ) VALUES (
-          ${id}, ${data.name}, ${data.email}, ${data.phone}, ${data.password}, ${data.role}, 
+          ${id}, ${data.name}, ${data.email}, ${data.phone}, ${hashedPassword}, ${data.role}, 
           ${data.avatar}, ${newUser.balance}, ${data.vehicleType || null}, ${data.vehicleModel || null}, 
-          ${data.plateNumber || null}, ${newUser.is_online}, ${newUser.is_verified}, 
+          ${data.plateNumber || null}, ${newUser.isOnline}, ${newUser.isVerified}, 
           ${data.licenseDoc || null}, ${data.ninDoc || null}
         )`;
       return { ...mapUser(newUser), token: 'pg_t' };

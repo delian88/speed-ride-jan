@@ -14,7 +14,8 @@
     "react-router-dom": "6.26.0",
     "recharts": "2.12.7",
     "lucide-react": "0.428.0",
-    "@neondatabase/serverless": "0.9.4"
+    "@neondatabase/serverless": "0.9.4",
+    "bcryptjs": "2.4.3"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
