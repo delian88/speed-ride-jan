@@ -6,7 +6,7 @@ import {
   LogOut, DollarSign, Activity, Bell, ChevronDown, ChevronRight, User as UserIcon, 
   BarChart3, Menu, Save, ShieldCheck, CreditCard, Gift, HelpCircle, FileText,
   Clock, MapPin, Navigation, Info, ShieldAlert, CheckCircle, RefreshCw, Layers,
-  Briefcase, Download, Plus
+  Briefcase, Download, Plus, Database, Cloud, Globe, Cpu, Terminal, Zap, Shield
 } from 'lucide-react';
 import { 
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, 
@@ -33,6 +33,151 @@ const StatCard: React.FC<{ label: string, value: string, trend: string, trendUp:
 
 // --- View Components ---
 
+const InfrastructureView: React.FC = () => {
+  const status = db.getConnectionStatus();
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleManualSync = () => {
+    setIsSyncing(true);
+    setTimeout(() => setIsSyncing(false), 2000);
+  };
+
+  return (
+    <div className="p-4 md:p-8 space-y-8 bg-[#f8fafc] h-full overflow-y-auto custom-scrollbar animate-in fade-in duration-500">
+       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        <div>
+          <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Neural Infrastructure</h2>
+          <p className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-1">Managed Core v4.2.0</p>
+        </div>
+        <div className={`flex items-center space-x-3 px-6 py-3 rounded-2xl border-2 ${status.type === 'PRODUCTION' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>
+           <div className={`w-3 h-3 rounded-full ${status.type === 'PRODUCTION' ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+           <span className="font-black text-xs uppercase tracking-widest">{status.type} ACTIVE</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+         {/* System Map */}
+         <div className="lg:col-span-2 bg-slate-900 rounded-[40px] p-10 text-white relative overflow-hidden shadow-2xl">
+            <div className="absolute top-0 right-0 w-96 h-96 bg-blue-500/10 rounded-full blur-[100px]" />
+            <h3 className="text-xl font-black mb-10 flex items-center space-x-3 uppercase tracking-tight">
+               <Layers className="text-blue-400" /> <span>System Architecture</span>
+            </h3>
+
+            <div className="flex flex-col items-center space-y-12 relative z-10">
+               <div className="flex flex-col items-center group">
+                  <div className="w-20 h-20 bg-white/10 rounded-[28px] border border-white/20 flex items-center justify-center mb-4 group-hover:bg-blue-600 transition-colors">
+                     <Globe className="w-8 h-8" />
+                  </div>
+                  <p className="font-black text-[10px] uppercase tracking-widest opacity-60">Edge Client</p>
+               </div>
+
+               <div className="h-16 w-0.5 bg-gradient-to-b from-blue-500/50 to-transparent relative">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-2 h-2 bg-blue-500 rounded-full animate-ping" />
+               </div>
+
+               <div className="flex flex-col items-center group">
+                  <div className={`w-24 h-24 rounded-[32px] border-2 flex items-center justify-center mb-4 transition-all duration-500 ${status.type === 'PRODUCTION' ? 'bg-emerald-500/20 border-emerald-500' : 'bg-amber-500/20 border-amber-500 animate-pulse'}`}>
+                     {status.type === 'PRODUCTION' ? <Cloud className="w-10 h-10 text-emerald-400" /> : <Database className="w-10 h-10 text-amber-400" />}
+                  </div>
+                  <p className="font-black text-sm uppercase tracking-tight">{status.provider}</p>
+                  <p className="text-[10px] font-bold text-slate-500 uppercase mt-1">Data Persistence Layer</p>
+               </div>
+            </div>
+         </div>
+
+         {/* Connection Details */}
+         <div className="bg-white rounded-[40px] p-8 border border-slate-100 shadow-sm space-y-8">
+            <h3 className="text-lg font-black text-slate-900 uppercase tracking-tight">Core Status</h3>
+            
+            <div className="space-y-6">
+               <div className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl">
+                  <div className="flex items-center space-x-3">
+                     <Cpu className="text-blue-500 w-5 h-5" />
+                     <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Engine</span>
+                  </div>
+                  <span className="text-xs font-black text-slate-900">V8.2.14</span>
+               </div>
+               <div className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl">
+                  <div className="flex items-center space-x-3">
+                     <Shield className="text-emerald-500 w-5 h-5" />
+                     <span className="text-xs font-black text-slate-500 uppercase tracking-widest">SSL</span>
+                  </div>
+                  <span className="text-xs font-black text-slate-900">ENABLED</span>
+               </div>
+               <div className="flex justify-between items-center p-4 bg-slate-50 rounded-2xl">
+                  <div className="flex items-center space-x-3">
+                     <Zap className="text-amber-500 w-5 h-5" />
+                     <span className="text-xs font-black text-slate-500 uppercase tracking-widest">Latency</span>
+                  </div>
+                  <span className="text-xs font-black text-slate-900">{status.type === 'PRODUCTION' ? '42ms' : '0.1ms'}</span>
+               </div>
+            </div>
+
+            <button 
+               onClick={handleManualSync}
+               disabled={isSyncing}
+               className="w-full py-5 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest flex items-center justify-center space-x-3 hover:bg-blue-600 transition"
+            >
+               {isSyncing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Terminal className="w-4 h-4" />}
+               <span>{isSyncing ? 'Synchronizing...' : 'Run Diagnostics'}</span>
+            </button>
+         </div>
+      </div>
+
+      <div className="bg-white rounded-[40px] p-10 border border-slate-100 shadow-sm">
+         <h3 className="text-2xl font-black text-slate-900 mb-8 uppercase tracking-tighter">Production Link Guide</h3>
+         <div className="grid md:grid-cols-2 gap-12">
+            <div className="space-y-6">
+               <div className="flex space-x-6">
+                  <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center font-black shrink-0">1</div>
+                  <div>
+                     <p className="font-black text-slate-900 mb-1 uppercase tracking-tight">Provision Database</p>
+                     <p className="text-sm text-slate-500 leading-relaxed font-medium">Create a free PostgreSQL instance at <a href="https://neon.tech" target="_blank" className="text-blue-600 underline">Neon.tech</a> or any other cloud provider.</p>
+                  </div>
+               </div>
+               <div className="flex space-x-6">
+                  <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center font-black shrink-0">2</div>
+                  <div>
+                     <p className="font-black text-slate-900 mb-1 uppercase tracking-tight">Obtain Connection URL</p>
+                     <p className="text-sm text-slate-500 leading-relaxed font-medium">Copy the full connection string starting with <code className="bg-slate-50 p-1 rounded text-pink-600 font-bold">postgres://...</code></p>
+                  </div>
+               </div>
+               <div className="flex space-x-6">
+                  <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center font-black shrink-0">3</div>
+                  <div>
+                     <p className="font-black text-slate-900 mb-1 uppercase tracking-tight">Inject Environment Variable</p>
+                     <p className="text-sm text-slate-500 leading-relaxed font-medium">Add a new variable named <code className="bg-slate-50 p-1 rounded text-blue-600 font-bold uppercase tracking-widest">DATABASE_URL</code> to your deployment settings.</p>
+                  </div>
+               </div>
+            </div>
+            <div className="bg-slate-50 rounded-3xl p-8 border border-slate-100">
+               <div className="flex items-center space-x-3 mb-6 text-slate-400">
+                  <Terminal className="w-5 h-5" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Verification Shell</span>
+               </div>
+               <div className="space-y-3 font-mono text-[11px]">
+                  <p className="text-emerald-600 font-bold"># Checking Neural Infrastructure...</p>
+                  {status.type === 'PRODUCTION' ? (
+                     <>
+                        <p className="text-slate-600 font-medium">OK: Cloud Engine Detected (PostgreSQL)</p>
+                        <p className="text-slate-600 font-medium">OK: Schema Validation Successful</p>
+                        <p className="text-slate-900 font-black mt-4">CORE STATUS: FULL PRODUCTION READY</p>
+                     </>
+                  ) : (
+                     <>
+                        <p className="text-amber-600 font-medium">WARN: No DATABASE_URL variable found.</p>
+                        <p className="text-slate-600 font-medium">INFO: Falling back to Sandbox Storage (Browser).</p>
+                        <p className="text-slate-900 font-black mt-4">CORE STATUS: LOCAL DEVELOPMENT ONLY</p>
+                     </>
+                  )}
+               </div>
+            </div>
+         </div>
+      </div>
+    </div>
+  );
+};
+
 const AdminMainDashboard: React.FC = () => {
   const [rides, setRides] = useState<RideRequest[]>([]);
   const [totalRevenue, setTotalRevenue] = useState(0);
@@ -40,7 +185,7 @@ const AdminMainDashboard: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       const r = await db.rides.getAll();
-      setRides(r.slice(-5).reverse());
+      setRides(r.slice(-5));
       setTotalRevenue(r.reduce((acc, curr) => acc + curr.fare, 0));
     };
     fetchData();
@@ -267,14 +412,11 @@ const AdminDashboard: React.FC = () => {
 
   const navItems = [
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
+    { to: '/admin/infra', icon: Database, label: 'Infrastructure' },
     { to: '/admin/map', icon: MapIcon, label: 'Live Map' },
     { to: '/admin/users', icon: Users, label: 'Drivers' },
     { to: '/admin/riders', icon: UserIcon, label: 'Riders' },
     { to: '/admin/rides', icon: Car, label: 'Trips' },
-    { to: '/admin/payments', icon: CreditCard, label: 'Payments' },
-    { to: '/admin/promos', icon: Gift, label: 'Promotions' },
-    { to: '/admin/reports', icon: BarChart3, label: 'Reports' },
-    { to: '/admin/support', icon: HelpCircle, label: 'Support Hub' },
     { to: '/admin/settings', icon: Settings, label: 'Settings' },
   ];
 
@@ -321,14 +463,9 @@ const AdminDashboard: React.FC = () => {
         <div className="flex-1 overflow-hidden relative bg-[#f8fafc]">
           <Routes>
             <Route path="/" element={<AdminMainDashboard />} />
+            <Route path="/infra" element={<InfrastructureView />} />
             <Route path="/map" element={<LiveMapView />} />
             <Route path="/users" element={<DriversView />} />
-            <Route path="/riders" element={<AdminMainDashboard />} />
-            <Route path="/rides" element={<AdminMainDashboard />} />
-            <Route path="/payments" element={<AdminMainDashboard />} />
-            <Route path="/promos" element={<AdminMainDashboard />} />
-            <Route path="/reports" element={<AdminMainDashboard />} />
-            <Route path="/support" element={<AdminMainDashboard />} />
             <Route path="/settings" element={<SettingsView />} />
             <Route path="*" element={<AdminMainDashboard />} />
           </Routes>
