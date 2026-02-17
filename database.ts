@@ -5,8 +5,6 @@ import { User, Driver, RideRequest, RideStatus, VehicleType } from './types';
 
 /**
  * SPEEDRIDE 2026 | Production-Grade Hybrid Data Engine
- * Architecture: Serverless PostgreSQL (Neon) with atomic transaction logic
- * Security: Bcrypt Hashing + Parameterized SQL
  */
 
 const SALT_ROUNDS = 10;
@@ -16,11 +14,11 @@ let sqlInstance: any = null;
 let isMock = false;
 let connectionError: string | null = null;
 
-// --- Mock Engine (LocalStorage Fallback) ---
 const mockDb = {
   users: [] as any[],
   rides: [] as any[],
   transactions: [] as any[],
+  invoices: [] as any[],
   settings: { baseFare: 1200, pricePerKm: 450, commission: 15, maintenanceMode: false }
 };
 
@@ -31,14 +29,12 @@ const loadMock = async () => {
     mockDb.users = data.users || [];
     mockDb.rides = data.rides || [];
     mockDb.transactions = data.transactions || [];
+    mockDb.invoices = data.invoices || [];
     mockDb.settings = data.settings || mockDb.settings;
   } else {
     const adminHash = await bcrypt.hash('admin123', SALT_ROUNDS);
-    const driverHash = await bcrypt.hash('password', SALT_ROUNDS);
-
     mockDb.users = [
-      { id: 'admin_01', name: 'System Admin', email: 'admin', phone: '08000000000', password: adminHash, role: 'ADMIN', avatar: 'https://i.pravatar.cc/150?u=admin', is_verified: true, balance: 0, rating: 5.0 },
-      { id: 'd1', name: 'Sarah Miller', email: 'driver@speedride.com', phone: '+234 812 345 6789', password: driverHash, role: 'DRIVER', avatar: 'https://i.pravatar.cc/150?u=sarah', rating: 4.9, balance: 0, vehicle_type: 'PREMIUM', vehicle_model: 'Tesla Model 3', plate_number: 'SR-777', is_online: true, is_verified: true }
+      { id: 'admin_01', name: 'System Admin', email: 'admin', phone: '08000000000', password: adminHash, role: 'ADMIN', avatar: 'https://i.pravatar.cc/150?u=admin', is_verified: true, balance: 0, rating: 5.0 }
     ];
     saveMock();
   }
@@ -48,7 +44,6 @@ const saveMock = () => {
   localStorage.setItem('speedride_local_db', JSON.stringify(mockDb));
 };
 
-// --- Postgres Initialization ---
 const getSql = () => {
   const url = process.env.DATABASE_URL || PRODUCTION_DB_URL;
   if (!url) {
@@ -66,7 +61,6 @@ const getSql = () => {
   }
 };
 
-// --- Data Mappers ---
 const mapUser = (u: any): User | Driver => {
   if (!u) return u;
   const { password, ...safeUser } = u;
@@ -98,7 +92,6 @@ const mapRide = (r: any): RideRequest => {
   };
 };
 
-// --- Production DB Interface ---
 export const db = {
   isLocal: () => isMock,
   getConnectionStatus: () => ({
@@ -113,7 +106,6 @@ export const db = {
     if (!sql) return;
     
     try {
-      // 1. Users Core
       await sql`
         CREATE TABLE IF NOT EXISTS users (
           id TEXT PRIMARY KEY, 
@@ -135,7 +127,6 @@ export const db = {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`;
       
-      // 2. Rides Telemetry
       await sql`
         CREATE TABLE IF NOT EXISTS rides (
           id TEXT PRIMARY KEY, 
@@ -150,20 +141,29 @@ export const db = {
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`;
 
-      // 3. Financial Ledger (Transactions)
       await sql`
         CREATE TABLE IF NOT EXISTS transactions (
           id SERIAL PRIMARY KEY,
           user_id TEXT REFERENCES users(id),
           ride_id TEXT REFERENCES rides(id),
           amount DECIMAL(15,2) NOT NULL,
-          type TEXT NOT NULL, -- 'CREDIT', 'DEBIT'
-          category TEXT NOT NULL, -- 'FARE', 'COMMISSION', 'TOPUP', 'WITHDRAWAL'
+          type TEXT NOT NULL, 
+          category TEXT NOT NULL, 
           description TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`;
+
+      await sql`
+        CREATE TABLE IF NOT EXISTS invoices (
+          id TEXT PRIMARY KEY,
+          user_id TEXT REFERENCES users(id),
+          invoice_no TEXT NOT NULL,
+          amount DECIMAL(15,2) NOT NULL,
+          status TEXT NOT NULL, -- 'PENDING', 'PAID', 'EXPIRED'
+          redirect_link TEXT,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`;
       
-      // 4. Platform Configuration
       await sql`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value JSONB)`;
       
       const count = await sql`SELECT count(*) FROM users`;
@@ -300,6 +300,40 @@ export const db = {
       await sql`INSERT INTO transactions (user_id, amount, type, category, description) VALUES (${userId}, ${amount}, 'CREDIT', 'TOPUP', 'Wallet Funding')`;
       const res = await sql`SELECT * FROM users WHERE id = ${userId}`;
       return mapUser(res[0]);
+    }
+  },
+
+  invoices: {
+    create: async (userId: string, data: any) => {
+      const id = 'inv_' + Math.random().toString(36).substr(2, 9);
+      if (isMock) {
+        const newInv = { ...data, id, user_id: userId, created_at: new Date().toISOString() };
+        mockDb.invoices.push(newInv);
+        saveMock();
+        return newInv;
+      }
+      const sql = getSql();
+      await sql`INSERT INTO invoices (id, user_id, invoice_no, amount, status, redirect_link) VALUES (${id}, ${userId}, ${data.invoice_no}, ${data.amount}, ${data.status}, ${data.redirect_link})`;
+      return { ...data, id, user_id: userId };
+    },
+    getByUser: async (userId: string) => {
+      if (isMock) return mockDb.invoices.filter(i => i.user_id === userId).reverse();
+      const sql = getSql();
+      return await sql`SELECT * FROM invoices WHERE user_id = ${userId} ORDER BY created_at DESC`;
+    },
+    updateStatus: async (invoiceNo: string, status: string) => {
+      if (isMock) {
+        const inv = mockDb.invoices.find(i => i.invoice_no === invoiceNo);
+        if (inv) {
+          inv.status = status;
+          saveMock();
+        }
+        return inv;
+      }
+      const sql = getSql();
+      await sql`UPDATE invoices SET status = ${status} WHERE invoice_no = ${invoiceNo}`;
+      const res = await sql`SELECT * FROM invoices WHERE invoice_no = ${invoiceNo}`;
+      return res[0];
     }
   },
 

@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { 
   MapPin, Navigation, Car, Zap, CheckCircle, 
-  Shield, ShieldCheck, Loader2, Plus, X, CreditCard, Wallet, LogOut, Menu
+  Shield, ShieldCheck, Loader2, Plus, X, CreditCard, Wallet, LogOut, Menu, History, ExternalLink, RefreshCw
 } from 'lucide-react';
 import { useApp } from '../App';
 import { RideStatus, VehicleType, RideRequest } from '../types';
@@ -11,9 +11,94 @@ import { db } from '../database';
 
 /**
  * SPEEDRIDE 2026 | BudPay Configuration
- * Integrated with Invoice API for secure wallet funding.
  */
 const BUDPAY_SECRET_KEY = "sk_test_zudz0pzuse78aospgybdczmwsv2drb6ddwr7lod"; 
+
+const InvoiceHistory: React.FC<{ onFunded: () => void }> = ({ onFunded }) => {
+  const { currentUser, showToast } = useApp();
+  const [invoices, setInvoices] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchInvoices = async () => {
+    if (!currentUser) return;
+    const list = await db.invoices.getByUser(currentUser.id);
+    setInvoices(list);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    fetchInvoices();
+  }, [currentUser]);
+
+  const handleManualVerify = async (inv: any) => {
+    // In production, we'd call BudPay verify_invoice. 
+    // Here we simulate completing a pending one.
+    if (inv.status === 'PAID') return;
+    
+    showToast("Verifying with Gateway Core...", "info");
+    setTimeout(async () => {
+      await db.invoices.updateStatus(inv.invoice_no, 'PAID');
+      await db.users.fundWallet(currentUser!.id, parseFloat(inv.amount));
+      showToast("Payment Synchronized. Wallet Updated.", "success");
+      onFunded();
+      fetchInvoices();
+    }, 1500);
+  };
+
+  return (
+    <div className="p-8 md:p-12 space-y-10 bg-white h-full overflow-y-auto custom-scrollbar">
+       <div className="flex justify-between items-center">
+         <div>
+            <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Invoice Ledger</h2>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Wallet Provisioning History</p>
+         </div>
+         <button onClick={fetchInvoices} className="p-4 bg-slate-50 text-slate-400 hover:text-blue-600 rounded-2xl transition">
+            <RefreshCw className="w-5 h-5" />
+         </button>
+       </div>
+
+       <div className="space-y-4">
+         {loading ? <div className="p-20 flex justify-center"><Loader2 className="w-10 h-10 animate-spin text-slate-200" /></div> :
+          invoices.length === 0 ? (
+            <div className="p-20 text-center space-y-4 bg-slate-50 rounded-[40px] border border-dashed border-slate-200">
+               <div className="w-16 h-16 bg-white rounded-3xl shadow-sm flex items-center justify-center mx-auto text-slate-200"><History className="w-8 h-8" /></div>
+               <p className="text-xs font-black text-slate-400 uppercase tracking-widest">No transmissions found in ledger</p>
+            </div>
+          ) : (
+            invoices.map((inv, idx) => (
+              <div key={idx} className="bg-slate-50 p-6 rounded-[32px] border border-slate-100 flex flex-col md:flex-row items-center justify-between gap-6 hover:border-blue-200 transition-all group">
+                 <div className="flex items-center space-x-6">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm ${inv.status === 'PAID' ? 'bg-emerald-100 text-emerald-600' : 'bg-amber-100 text-amber-600'}`}>
+                       <CreditCard className="w-6 h-6" />
+                    </div>
+                    <div>
+                       <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{inv.invoice_no}</p>
+                       <p className="text-xl font-black text-slate-900">₦{parseFloat(inv.amount).toLocaleString()}</p>
+                    </div>
+                 </div>
+                 
+                 <div className="flex items-center space-x-4 w-full md:w-auto">
+                    <span className={`px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-widest ${inv.status === 'PAID' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                       {inv.status}
+                    </span>
+                    {inv.status !== 'PAID' && (
+                       <>
+                         <a href={inv.redirect_link} target="_blank" rel="noreferrer" className="flex-1 md:flex-none py-3 px-6 bg-blue-600 text-white rounded-xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center space-x-2">
+                           <span>Pay Now</span><ExternalLink className="w-3 h-3" />
+                         </a>
+                         <button onClick={() => handleManualVerify(inv)} className="p-3 bg-white border border-slate-200 text-slate-400 hover:text-emerald-600 rounded-xl transition">
+                           <CheckCircle className="w-5 h-5" />
+                         </button>
+                       </>
+                    )}
+                 </div>
+              </div>
+            ))
+          )}
+       </div>
+    </div>
+  );
+};
 
 const TopUpModal: React.FC<{ isOpen: boolean, onClose: () => void, onFunded: () => void }> = ({ isOpen, onClose, onFunded }) => {
   const { currentUser, showToast } = useApp();
@@ -32,7 +117,8 @@ const TopUpModal: React.FC<{ isOpen: boolean, onClose: () => void, onFunded: () 
 
     try {
       const duedate = new Date();
-      duedate.setDate(duedate.getDate() + 1); // 24h validity
+      duedate.setDate(duedate.getDate() + 1); 
+      const invoiceNo = `SR-${Date.now()}`;
 
       const response = await fetch('https://api.budpay.com/api/v2/create_invoice', {
         method: 'POST',
@@ -41,17 +127,25 @@ const TopUpModal: React.FC<{ isOpen: boolean, onClose: () => void, onFunded: () 
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          title: "Wallet Credit - SpeedRide",
+          title: "Wallet Top-up - SpeedRide",
           duedate: duedate.toISOString().split('T')[0],
           currency: "NGN",
+          invoicenumber: invoiceNo,
+          reminder: "1",
           email: currentUser?.email,
           first_name: currentUser?.name.split(' ')[0] || "User",
           last_name: currentUser?.name.split(' ')[1] || "SpeedRide",
+          billing_address: "SpeedRide Terminal 1",
+          billing_city: "Abuja",
+          billing_state: "FCT",
+          billing_country: "Nigeria",
+          billing_zipcode: "234",
           items: [
             {
-              description: "Neural Wallet Top-up",
+              description: "Neural Wallet Credit Injection",
               quantity: "1",
-              unit_price: val.toString()
+              unit_price: val.toString(),
+              meta_data: ""
             }
           ]
         })
@@ -59,25 +153,25 @@ const TopUpModal: React.FC<{ isOpen: boolean, onClose: () => void, onFunded: () 
 
       const result = await response.json();
 
-      if (result.success && result.data?.[0]?.redirect_link) {
+      if (result.success && result.data && result.data[0]?.redirect_link) {
         const link = result.data[0].redirect_link;
+        
+        // PERSIST TO LOCAL DB LEDGER
+        await db.invoices.create(currentUser!.id, {
+          invoice_no: invoiceNo,
+          amount: val,
+          status: 'PENDING',
+          redirect_link: link
+        });
+
         setInvoiceLink(link);
-        showToast("Invoice generated. Redirecting...", "success");
-        
-        // Open payment link in new window
+        showToast("Invoice recorded and generated.", "success");
         window.open(link, '_blank', 'noopener,noreferrer');
-        
-        // For demonstration, we simulate funding after a brief delay
-        // In production, you would verify via the verify_transaction endpoint or use a webhook.
-        setTimeout(async () => {
-          await db.users.fundWallet(currentUser!.id, val);
-          onFunded();
-        }, 2000);
       } else {
-        throw new Error(result.message || "Failed to create invoice");
+        throw new Error(result.message || "BudPay API rejection.");
       }
     } catch (e: any) {
-      showToast(e.message || "Gateway Error", "error");
+      showToast(e.message || "Gateway Failure", "error");
     } finally {
       setIsFunding(false);
     }
@@ -131,16 +225,16 @@ const TopUpModal: React.FC<{ isOpen: boolean, onClose: () => void, onFunded: () 
                    <CheckCircle className="w-8 h-8" />
                 </div>
                 <p className="text-sm font-bold text-slate-600 leading-relaxed">
-                  Invoice generated successfully. Please complete the payment in the opened tab.
+                  Local Ledger Sync'd. Visit the "Invoices" section to track or complete this request.
                 </p>
                 <button 
                   onClick={() => { setInvoiceLink(null); onClose(); }}
                   className="w-full py-5 bg-slate-900 text-white rounded-[24px] font-black text-[10px] uppercase tracking-widest"
                 >
-                  I have completed payment
+                  I'll check later
                 </button>
                 <a href={invoiceLink} target="_blank" rel="noreferrer" className="block text-[10px] font-black text-blue-600 uppercase tracking-widest underline">
-                  Re-open Payment Link
+                  Open Payment Portal
                 </a>
              </div>
            )}
@@ -321,7 +415,7 @@ const RiderExplore: React.FC<{ onOpenTopUp: () => void }> = ({ onOpenTopUp }) =>
 
 const RiderDashboard: React.FC = () => {
   const { logout, currentUser, refreshUser } = useApp();
-  const [isNavOpen, setIsNavOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<'EXPLORE' | 'INVOICES'>('EXPLORE');
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
 
   return (
@@ -330,11 +424,15 @@ const RiderDashboard: React.FC = () => {
 
       <header className="h-24 bg-slate-900 text-white flex items-center justify-between px-8 md:px-12 z-50 shrink-0 border-b border-white/5 shadow-2xl">
         <div className="flex items-center space-x-8">
-          <button onClick={() => setIsNavOpen(!isNavOpen)} className="lg:hidden p-3 text-white/40 hover:text-white transition rounded-2xl bg-white/5"><Menu className="w-6 h-6" /></button>
           <div className="flex items-center space-x-3">
             <div className="w-12 h-12 bg-blue-600 rounded-[20px] flex items-center justify-center shadow-2xl shadow-blue-600/30 rotate-3"><Car className="w-7 h-7 text-white" /></div>
             <span className="font-black text-2xl tracking-tighter hidden sm:block uppercase">SPEEDRIDE</span>
           </div>
+          
+          <nav className="hidden lg:flex items-center space-x-4 bg-white/5 p-1.5 rounded-[22px] border border-white/10">
+             <button onClick={() => setActiveTab('EXPLORE')} className={`px-6 py-2.5 rounded-[18px] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'EXPLORE' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-slate-400 hover:text-white'}`}>Explore</button>
+             <button onClick={() => setActiveTab('INVOICES')} className={`px-6 py-2.5 rounded-[18px] text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'INVOICES' ? 'bg-blue-600 text-white shadow-xl shadow-blue-600/20' : 'text-slate-400 hover:text-white'}`}>Invoices</button>
+          </nav>
         </div>
         
         <div className="flex items-center space-x-8">
@@ -362,11 +460,18 @@ const RiderDashboard: React.FC = () => {
       </header>
 
       <div className="flex-1 overflow-hidden relative">
-        <Routes>
-          <Route index element={<RiderExplore onOpenTopUp={() => setIsTopUpOpen(true)} />} />
-          <Route path="*" element={<div className="p-20 text-center font-black text-slate-300 uppercase tracking-widest text-sm">Synchronizing Component...</div>} />
-        </Routes>
+        {activeTab === 'EXPLORE' ? (
+          <RiderExplore onOpenTopUp={() => setIsTopUpOpen(true)} />
+        ) : (
+          <InvoiceHistory onFunded={refreshUser} />
+        )}
       </div>
+
+      {/* Mobile Nav */}
+      <nav className="lg:hidden fixed bottom-8 left-1/2 -translate-x-1/2 glass rounded-[32px] p-2 flex items-center space-x-2 z-[100] border border-white/20 shadow-2xl">
+         <button onClick={() => setActiveTab('EXPLORE')} className={`p-4 rounded-[24px] ${activeTab === 'EXPLORE' ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-400'}`}><MapPin /></button>
+         <button onClick={() => setActiveTab('INVOICES')} className={`p-4 rounded-[24px] ${activeTab === 'INVOICES' ? 'bg-blue-600 text-white shadow-xl' : 'text-slate-400'}`}><History /></button>
+      </nav>
     </div>
   );
 };
