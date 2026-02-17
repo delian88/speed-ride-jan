@@ -7,6 +7,9 @@ import { User, Driver, RideRequest, RideStatus, VehicleType } from './types';
  * Infrastructure: PostgreSQL (Neon) with persistent LocalStorage Fallback
  */
 
+// User provided production string
+const PRODUCTION_DB_URL = 'postgresql://neondb_owner:npg_JNlD0ieCuW1z@ep-crimson-frog-aimk0mkg-pooler.c-4.us-east-1.aws.neon.tech/speedride?sslmode=require&channel_binding=require';
+
 let sqlInstance: any = null;
 let isMock = false;
 let connectionError: string | null = null;
@@ -41,20 +44,22 @@ const saveMock = () => {
 
 // --- Postgres Logic ---
 const getSql = () => {
-  const url = process.env.DATABASE_URL;
+  // Use environment variable if present, otherwise fallback to the provided production string
+  const url = process.env.DATABASE_URL || PRODUCTION_DB_URL;
+  
   if (!url) {
     if (!isMock) {
-      console.warn("SPEEDRIDE: DATABASE_URL not found. Using Sandbox Engine.");
       isMock = true;
       loadMock();
     }
     return null;
   }
+  
   try {
     if (!sqlInstance) sqlInstance = neon(url);
     return sqlInstance;
   } catch (e) {
-    connectionError = "Invalid Connection String";
+    connectionError = "Connection string parsing failed.";
     isMock = true;
     loadMock();
     return null;
@@ -104,7 +109,7 @@ export const db = {
     if (!sql) return;
     
     try {
-      // Create tables with production schema
+      // Create tables following the production schema.sql structure
       await sql`
         CREATE TABLE IF NOT EXISTS users (
           id TEXT PRIMARY KEY, 
@@ -144,10 +149,12 @@ export const db = {
       
       const count = await sql`SELECT count(*) FROM users`;
       if (parseInt(count[0].count) === 0) {
+        // Seed default admin if table is empty
         await sql`INSERT INTO users (id, name, email, phone, password, role, is_verified) VALUES ('admin_01', 'Admin', 'admin', '080', 'admin123', 'ADMIN', true)`;
         await sql`INSERT INTO settings (key, value) VALUES ('global_config', '{"baseFare": 1200, "pricePerKm": 450, "commission": 15}'::jsonb)`;
       }
       isMock = false;
+      console.log("SPEEDRIDE: Cloud Neural Core Online.");
     } catch (e: any) {
       console.error("Postgres initialization failed. Reverting to Sandbox.", e);
       connectionError = e.message;
