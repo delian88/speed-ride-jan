@@ -14,25 +14,27 @@ import { db } from '../database';
  */
 const BUDPAY_SECRET_KEY = "sk_test_zudz0pzuse78aospgybdczmwsv2drb6ddwr7lod"; 
 
-const InvoiceHistory: React.FC<{ onFunded: () => void }> = ({ onFunded }) => {
+const InvoiceHistory: React.FC<{ refreshTrigger: number, onFunded: () => void }> = ({ refreshTrigger, onFunded }) => {
   const { currentUser, showToast } = useApp();
   const [invoices, setInvoices] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchInvoices = async () => {
     if (!currentUser) return;
-    const list = await db.invoices.getByUser(currentUser.id);
-    setInvoices(list);
-    setLoading(false);
+    try {
+      setLoading(true);
+      const list = await db.invoices.getByUser(currentUser.id);
+      setInvoices(list);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     fetchInvoices();
-  }, [currentUser]);
+  }, [currentUser, refreshTrigger]);
 
   const handleManualVerify = async (inv: any) => {
-    // In production, we'd call BudPay verify_invoice. 
-    // Here we simulate completing a pending one.
     if (inv.status === 'PAID') return;
     
     showToast("Verifying with Gateway Core...", "info");
@@ -53,16 +55,17 @@ const InvoiceHistory: React.FC<{ onFunded: () => void }> = ({ onFunded }) => {
             <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mt-1">Wallet Provisioning History</p>
          </div>
          <button onClick={fetchInvoices} className="p-4 bg-slate-50 text-slate-400 hover:text-blue-600 rounded-2xl transition">
-            <RefreshCw className="w-5 h-5" />
+            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
          </button>
        </div>
 
        <div className="space-y-4">
-         {loading ? <div className="p-20 flex justify-center"><Loader2 className="w-10 h-10 animate-spin text-slate-200" /></div> :
+         {loading && invoices.length === 0 ? <div className="p-20 flex justify-center"><Loader2 className="w-10 h-10 animate-spin text-slate-200" /></div> :
           invoices.length === 0 ? (
             <div className="p-20 text-center space-y-4 bg-slate-50 rounded-[40px] border border-dashed border-slate-200">
                <div className="w-16 h-16 bg-white rounded-3xl shadow-sm flex items-center justify-center mx-auto text-slate-200"><History className="w-8 h-8" /></div>
                <p className="text-xs font-black text-slate-400 uppercase tracking-widest">No transmissions found in ledger</p>
+               <p className="text-[10px] text-slate-400 uppercase">Tip: Invoices using Test Keys only appear in BudPay's "Test Mode" dashboard.</p>
             </div>
           ) : (
             invoices.map((inv, idx) => (
@@ -153,10 +156,10 @@ const TopUpModal: React.FC<{ isOpen: boolean, onClose: () => void, onFunded: () 
 
       const result = await response.json();
 
-      if (result.success && result.data && result.data[0]?.redirect_link) {
+      // BudPay API returns 'status' boolean
+      if (result.status && result.data && result.data[0]?.redirect_link) {
         const link = result.data[0].redirect_link;
         
-        // PERSIST TO LOCAL DB LEDGER
         await db.invoices.create(currentUser!.id, {
           invoice_no: invoiceNo,
           amount: val,
@@ -165,10 +168,12 @@ const TopUpModal: React.FC<{ isOpen: boolean, onClose: () => void, onFunded: () 
         });
 
         setInvoiceLink(link);
-        showToast("Invoice recorded and generated.", "success");
+        showToast("Invoice recorded and synchronized.", "success");
         window.open(link, '_blank', 'noopener,noreferrer');
+        onFunded(); // Notify parent to refresh list
       } else {
-        throw new Error(result.message || "BudPay API rejection.");
+        console.error("BudPay API Error:", result);
+        throw new Error(result.message || "BudPay API rejection. Check keys.");
       }
     } catch (e: any) {
       showToast(e.message || "Gateway Failure", "error");
@@ -417,10 +422,16 @@ const RiderDashboard: React.FC = () => {
   const { logout, currentUser, refreshUser } = useApp();
   const [activeTab, setActiveTab] = useState<'EXPLORE' | 'INVOICES'>('EXPLORE');
   const [isTopUpOpen, setIsTopUpOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  const handleFunded = () => {
+    refreshUser();
+    setRefreshTrigger(prev => prev + 1);
+  };
 
   return (
     <div className="flex flex-col h-screen bg-white font-inter">
-      <TopUpModal isOpen={isTopUpOpen} onClose={() => setIsTopUpOpen(false)} onFunded={refreshUser} />
+      <TopUpModal isOpen={isTopUpOpen} onClose={() => setIsTopUpOpen(false)} onFunded={handleFunded} />
 
       <header className="h-24 bg-slate-900 text-white flex items-center justify-between px-8 md:px-12 z-50 shrink-0 border-b border-white/5 shadow-2xl">
         <div className="flex items-center space-x-8">
@@ -463,7 +474,7 @@ const RiderDashboard: React.FC = () => {
         {activeTab === 'EXPLORE' ? (
           <RiderExplore onOpenTopUp={() => setIsTopUpOpen(true)} />
         ) : (
-          <InvoiceHistory onFunded={refreshUser} />
+          <InvoiceHistory refreshTrigger={refreshTrigger} onFunded={handleFunded} />
         )}
       </div>
 

@@ -159,7 +159,7 @@ export const db = {
           user_id TEXT REFERENCES users(id),
           invoice_no TEXT NOT NULL,
           amount DECIMAL(15,2) NOT NULL,
-          status TEXT NOT NULL, -- 'PENDING', 'PAID', 'EXPIRED'
+          status TEXT NOT NULL, 
           redirect_link TEXT,
           created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )`;
@@ -317,7 +317,9 @@ export const db = {
       return { ...data, id, user_id: userId };
     },
     getByUser: async (userId: string) => {
-      if (isMock) return mockDb.invoices.filter(i => i.user_id === userId).reverse();
+      if (isMock) {
+        return mockDb.invoices.filter(i => i.user_id === userId).reverse();
+      }
       const sql = getSql();
       return await sql`SELECT * FROM invoices WHERE user_id = ${userId} ORDER BY created_at DESC`;
     },
