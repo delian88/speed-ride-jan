@@ -119,6 +119,7 @@ const SafetyPage: React.FC = () => {
               <Link to="/" className="hover:text-blue-600 transition">Home</Link>
               <Link to="/fleet" className="hover:text-blue-600 transition">Fleet</Link>
               <Link to="/drive" className="hover:text-blue-600 transition">Drive</Link>
+              <Link to="/contact" className="hover:text-blue-600 transition">Contact</Link>
             </div>
           </div>
         </div>

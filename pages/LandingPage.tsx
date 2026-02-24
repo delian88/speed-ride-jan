@@ -30,6 +30,7 @@ const LandingPage: React.FC = () => {
               <Link to="/safety" className="hover:text-blue-600 transition-colors">Safety</Link>
               <Link to="/drive" className="hover:text-blue-600 transition-colors">Drive</Link>
               <Link to="/how-it-works" className="hover:text-blue-600 transition-colors">How it Works</Link>
+              <Link to="/contact" className="hover:text-blue-600 transition-colors">Contact</Link>
             </div>
 
             <div className="flex items-center space-x-4 md:space-x-6">
@@ -55,6 +56,7 @@ const LandingPage: React.FC = () => {
             <Link to="/safety" onClick={() => setIsMobileMenuOpen(false)} className="block font-bold text-slate-600 hover:text-blue-600">Safety</Link>
             <Link to="/drive" onClick={() => setIsMobileMenuOpen(false)} className="block font-bold text-slate-600 hover:text-blue-600">Drive</Link>
             <Link to="/how-it-works" onClick={() => setIsMobileMenuOpen(false)} className="block font-bold text-slate-600 hover:text-blue-600">How it Works</Link>
+            <Link to="/contact" onClick={() => setIsMobileMenuOpen(false)} className="block font-bold text-slate-600 hover:text-blue-600">Contact</Link>
             <Link to="/auth" onClick={() => setIsMobileMenuOpen(false)} className="block font-bold text-slate-600 hover:text-blue-600">Sign In</Link>
           </div>
         )}
@@ -331,12 +333,12 @@ const LandingPage: React.FC = () => {
               </ul>
             </div>
             <div className="space-y-6">
-              <h4 className="text-slate-900 font-black text-xs uppercase tracking-[0.2em]">Legal</h4>
+              <h4 className="text-slate-900 font-black text-xs uppercase tracking-[0.2em]">Support</h4>
               <ul className="space-y-4 text-sm font-bold text-slate-500">
-                <li><a href="#" className="hover:text-blue-600 transition">Terms of Service</a></li>
-                <li><a href="#" className="hover:text-blue-600 transition">Privacy Policy</a></li>
-                <li><a href="#" className="hover:text-blue-600 transition">Cookie Settings</a></li>
-                <li><a href="#" className="hover:text-blue-600 transition">IP Protection</a></li>
+                <li><Link to="/contact" className="hover:text-blue-600 transition">Contact Us</Link></li>
+                <li><a href="#" className="hover:text-blue-600 transition">Help Center</a></li>
+                <li><a href="#" className="hover:text-blue-600 transition">Community</a></li>
+                <li><a href="#" className="hover:text-blue-600 transition">Accessibility</a></li>
               </ul>
             </div>
           </div>

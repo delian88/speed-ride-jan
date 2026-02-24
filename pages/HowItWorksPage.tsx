@@ -162,6 +162,7 @@ const HowItWorksPage: React.FC = () => {
               <Link to="/fleet" className="hover:text-blue-600 transition">Fleet</Link>
               <Link to="/safety" className="hover:text-blue-600 transition">Safety</Link>
               <Link to="/drive" className="hover:text-blue-600 transition">Drive</Link>
+              <Link to="/contact" className="hover:text-blue-600 transition">Contact</Link>
             </div>
           </div>
         </div>

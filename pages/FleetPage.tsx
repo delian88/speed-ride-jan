@@ -128,6 +128,7 @@ const FleetPage: React.FC = () => {
               <Link to="/" className="hover:text-white transition">Home</Link>
               <Link to="/safety" className="hover:text-white transition">Safety</Link>
               <Link to="/drive" className="hover:text-white transition">Drive</Link>
+              <Link to="/contact" className="hover:text-white transition">Contact</Link>
             </div>
           </div>
         </div>

@@ -16,6 +16,7 @@ import FleetPage from './pages/FleetPage';
 import SafetyPage from './pages/SafetyPage';
 import DrivePage from './pages/DrivePage';
 import HowItWorksPage from './pages/HowItWorksPage';
+import ContactPage from './pages/ContactPage';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -184,6 +185,7 @@ const App: React.FC = () => {
             <Route path="/safety" element={<SafetyPage />} />
             <Route path="/drive" element={<DrivePage />} />
             <Route path="/how-it-works" element={<HowItWorksPage />} />
+            <Route path="/contact" element={<ContactPage />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/rider/*" element={isAuthenticated && currentUser?.role === 'RIDER' ? <RiderDashboard /> : <Navigate to="/auth" />} />
             <Route path="/driver/*" element={isAuthenticated && currentUser?.role === 'DRIVER' ? <DriverDashboard /> : <Navigate to="/auth" />} />
