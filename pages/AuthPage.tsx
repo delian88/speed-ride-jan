@@ -119,6 +119,14 @@ const AuthPage: React.FC = () => {
     setIsLoading(true);
     setError('');
     try {
+      // Check if user already exists
+      const existingUser = await db.users.getByEmail(formData.email);
+      if (existingUser) {
+        showToast("An account with this email already exists.", "error");
+        setIsLoading(false);
+        return;
+      }
+
       const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
       
       // Save to database temporarily
