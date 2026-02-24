@@ -12,17 +12,9 @@ interface MailOptions {
 
 const SMTP_CONFIG = {
   Host: "smtp.gmail.com",
-  Username: "walpconsult@gmail.com",
-  Password: "mjbhowjkzmfxqrgd", 
-  From: "walpconsult@gmail.com"
-};
-
-const triggerVirtualInterceptor = (subject: string, body: string, otp?: string) => {
-  const event = new CustomEvent('speedride_mail_intercept', { 
-    detail: { subject, body, otp, timestamp: new Date().toLocaleTimeString() } 
-  });
-  window.dispatchEvent(event);
-  console.log(`%c SpeedRide Interceptor | ${subject}`, 'background: #1e293b; color: #3b82f6; padding: 4px 8px; font-weight: bold; border-radius: 4px;');
+  Username: "taiwodele88@gmail.com",
+  Password: "ucbznlbhnbogwuer", 
+  From: "taiwodele88@gmail.com"
 };
 
 const dispatchEmail = async (to: string, subject: string, body: string) => {
@@ -59,7 +51,6 @@ export const sendWelcomeEmail = async ({ email, name, role }: MailOptions) => {
     </div>
   `;
 
-  triggerVirtualInterceptor(subject, isDriver ? "Document verification in progress." : "Account initialized.");
   return await dispatchEmail(email, subject, body);
 };
 
@@ -78,7 +69,6 @@ export const sendOtpEmail = async (email: string, otp: string) => {
     </div>
   `;
 
-  triggerVirtualInterceptor(subject, `OTP Transmission: ${otp}`, otp);
   return await dispatchEmail(email, subject, body);
 };
 
@@ -97,6 +87,5 @@ export const sendResetEmail = async (email: string, otp: string) => {
     </div>
   `;
 
-  triggerVirtualInterceptor("Recovery Signal Detected", "Secure access requested.", otp);
   return await dispatchEmail(email, subject, body);
 };

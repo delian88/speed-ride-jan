@@ -14,13 +14,6 @@ import Logo from '../components/Logo';
 
 type AuthView = 'LOGIN' | 'SIGNUP' | 'OTP' | 'FORGOT' | 'RESET' | 'SUCCESS';
 
-interface InterceptedMail {
-  subject: string;
-  body: string;
-  otp?: string;
-  timestamp: string;
-}
-
 const AuthPage: React.FC = () => {
   const [view, setView] = useState<AuthView>('LOGIN');
   const [role, setRole] = useState<'RIDER' | 'DRIVER' | 'ADMIN'>('RIDER');
@@ -41,19 +34,8 @@ const AuthPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   
-  const [interceptedMail, setInterceptedMail] = useState<InterceptedMail | null>(null);
-
   const { login, showToast } = useApp();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    const handleMailIntercept = (e: any) => {
-      setInterceptedMail(e.detail);
-      setTimeout(() => setInterceptedMail(null), 12000);
-    };
-    window.addEventListener('speedride_mail_intercept', handleMailIntercept);
-    return () => window.removeEventListener('speedride_mail_intercept', handleMailIntercept);
-  }, []);
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: 'licenseDoc' | 'ninDoc') => {
     const file = e.target.files?.[0];
@@ -401,30 +383,6 @@ const AuthPage: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 p-6 relative overflow-hidden">
-      {/* VIRTUAL MAIL INTERCEPTOR UI */}
-      {interceptedMail && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 w-full max-w-lg z-[200] animate-slide-top px-4">
-           <div className="bg-slate-900 text-white p-6 rounded-[32px] shadow-2xl border-2 border-blue-500/50 backdrop-blur-xl relative overflow-hidden">
-              <div className="flex items-center space-x-4 mb-4">
-                <div className="p-3 bg-blue-600 rounded-2xl"><Mail className="w-6 h-6" /></div>
-                <div>
-                   <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Transmission Intercepted</p>
-                   <p className="text-sm font-black">{interceptedMail.subject}</p>
-                </div>
-              </div>
-              <div className="bg-white/5 p-4 rounded-2xl border border-white/10 mb-4">
-                 <p className="text-xs text-slate-300 font-medium leading-relaxed">{interceptedMail.body}</p>
-              </div>
-              {interceptedMail.otp && (
-                <div className="flex items-center justify-between">
-                   <div className="flex items-center space-x-2 text-slate-400"><Zap className="w-4 h-4 text-yellow-400" /><span className="text-[10px] font-black uppercase tracking-widest">Access Code</span></div>
-                   <span className="text-2xl font-black text-blue-400 tracking-[0.2em]">{interceptedMail.otp}</span>
-                </div>
-              )}
-           </div>
-        </div>
-      )}
-
       <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-100/30 rounded-full blur-[120px] -z-10"></div>
       <div className="max-w-md w-full bg-white rounded-[40px] shadow-2xl border border-white p-10 animate-fade-up relative">
         <Link to="/" className="absolute top-8 left-8 p-2 text-slate-400 hover:text-slate-900 transition-colors group">
