@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useApp } from '../App';
 import { db } from '../database';
 import { sendWelcomeEmail, sendOtpEmail, sendResetEmail } from '../services/mail';
@@ -426,7 +426,10 @@ const AuthPage: React.FC = () => {
       )}
 
       <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-blue-100/30 rounded-full blur-[120px] -z-10"></div>
-      <div className="max-w-md w-full bg-white rounded-[40px] shadow-2xl border border-white p-10 animate-fade-up">
+      <div className="max-w-md w-full bg-white rounded-[40px] shadow-2xl border border-white p-10 animate-fade-up relative">
+        <Link to="/" className="absolute top-8 left-8 p-2 text-slate-400 hover:text-slate-900 transition-colors group">
+          <ChevronLeft className="w-6 h-6 group-hover:-translate-x-1 transition-transform" />
+        </Link>
         <div className="flex flex-col items-center justify-center mb-10">
           <Logo className="h-20 w-auto" />
         </div>
