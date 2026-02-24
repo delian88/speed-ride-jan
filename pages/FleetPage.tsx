@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Car, Zap, Users, Smartphone, ShieldCheck, Clock, CreditCard, ChevronRight, ArrowRight } from 'lucide-react';
+import { Car, Zap, Users, Smartphone, ShieldCheck, Clock, CreditCard, ChevronRight, ArrowRight, Truck, Bus, Bike, Star } from 'lucide-react';
 import Logo from '../components/Logo';
 
 const FleetPage: React.FC = () => {
@@ -32,84 +32,118 @@ const FleetPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="grid md:grid-cols-2 gap-12">
-            <div className="space-y-8">
-              <div className="bg-slate-50 p-10 rounded-[48px] border border-slate-100 hover:border-blue-200 transition-all">
-                <div className="w-16 h-16 bg-blue-600 text-white rounded-2xl flex items-center justify-center mb-8 shadow-xl">
-                  <Smartphone className="w-8 h-8" />
-                </div>
-                <h2 className="text-3xl font-black text-slate-900 mb-4">Economy Plus</h2>
-                <p className="text-slate-600 font-medium leading-relaxed mb-6">
-                  Our most popular choice for daily commutes. Clean, modern sedans with professional drivers who know every shortcut in the city.
-                </p>
-                <ul className="space-y-3 mb-8">
-                  <li className="flex items-center text-sm font-bold text-slate-500"><CheckCircle className="w-4 h-4 mr-2 text-emerald-500" /> Seats up to 4</li>
-                  <li className="flex items-center text-sm font-bold text-slate-500"><CheckCircle className="w-4 h-4 mr-2 text-emerald-500" /> Climate Control</li>
-                  <li className="flex items-center text-sm font-bold text-slate-500"><CheckCircle className="w-4 h-4 mr-2 text-emerald-500" /> 5-Star Rated Drivers</li>
-                </ul>
-                <div className="pt-6 border-t border-slate-200 flex justify-between items-center">
-                  <span className="text-xs font-black uppercase tracking-widest text-blue-600">Starting at ₦1,200</span>
-                  <Link to="/auth" className="font-black text-xs uppercase tracking-widest flex items-center hover:text-blue-600">Book <ChevronRight className="w-4 h-4 ml-1" /></Link>
-                </div>
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {/* Economy */}
+            <div className="bg-slate-50 p-8 rounded-[40px] border border-slate-100 hover:border-blue-200 transition-all group">
+              <div className="w-14 h-14 bg-blue-600 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform">
+                <Smartphone className="w-7 h-7" />
               </div>
-
-              <div className="bg-slate-50 p-10 rounded-[48px] border border-slate-100 hover:border-blue-200 transition-all">
-                <div className="w-16 h-16 bg-indigo-600 text-white rounded-2xl flex items-center justify-center mb-8 shadow-xl">
-                  <Zap className="w-8 h-8" />
-                </div>
-                <h2 className="text-3xl font-black text-slate-900 mb-4">Tesla Premium</h2>
-                <p className="text-slate-600 font-medium leading-relaxed mb-6">
-                  Arrive in style and silence. Our premium electric fleet offers a quiet, luxurious experience with advanced tech features.
-                </p>
-                <ul className="space-y-3 mb-8">
-                  <li className="flex items-center text-sm font-bold text-slate-500"><CheckCircle className="w-4 h-4 mr-2 text-emerald-500" /> All-Electric Fleet</li>
-                  <li className="flex items-center text-sm font-bold text-slate-500"><CheckCircle className="w-4 h-4 mr-2 text-emerald-500" /> In-car Wi-Fi & Charging</li>
-                  <li className="flex items-center text-sm font-bold text-slate-500"><CheckCircle className="w-4 h-4 mr-2 text-emerald-500" /> Premium Sound System</li>
-                </ul>
-                <div className="pt-6 border-t border-slate-200 flex justify-between items-center">
-                  <span className="text-xs font-black uppercase tracking-widest text-indigo-600">Starting at ₦3,500</span>
-                  <Link to="/auth" className="font-black text-xs uppercase tracking-widest flex items-center hover:text-indigo-600">Book <ChevronRight className="w-4 h-4 ml-1" /></Link>
-                </div>
+              <h2 className="text-2xl font-black text-slate-900 mb-3">Economy</h2>
+              <p className="text-slate-600 text-sm font-medium leading-relaxed mb-6">
+                Affordable, everyday rides. Perfect for your daily commute across the city.
+              </p>
+              <ul className="space-y-2 mb-6">
+                <li className="flex items-center text-xs font-bold text-slate-500"><CheckCircle className="w-3 h-3 mr-2 text-emerald-500" /> Seats up to 4</li>
+                <li className="flex items-center text-xs font-bold text-slate-500"><CheckCircle className="w-3 h-3 mr-2 text-emerald-500" /> Professional Drivers</li>
+              </ul>
+              <div className="pt-6 border-t border-slate-200 flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase tracking-widest text-blue-600">From ₦1,200</span>
+                <Link to="/auth" className="font-black text-[10px] uppercase tracking-widest flex items-center hover:text-blue-600">Book <ChevronRight className="w-3 h-3 ml-1" /></Link>
               </div>
             </div>
 
-            <div className="space-y-8 md:mt-12">
-              <div className="bg-slate-50 p-10 rounded-[48px] border border-slate-100 hover:border-blue-200 transition-all">
-                <div className="w-16 h-16 bg-emerald-600 text-white rounded-2xl flex items-center justify-center mb-8 shadow-xl">
-                  <Users className="w-8 h-8" />
-                </div>
-                <h2 className="text-3xl font-black text-slate-900 mb-4">Speed XL</h2>
-                <p className="text-slate-600 font-medium leading-relaxed mb-6">
-                  Perfect for groups, families, or when you just need that extra space for luggage. Spacious SUVs and vans at your service.
-                </p>
-                <ul className="space-y-3 mb-8">
-                  <li className="flex items-center text-sm font-bold text-slate-500"><CheckCircle className="w-4 h-4 mr-2 text-emerald-500" /> Seats up to 8</li>
-                  <li className="flex items-center text-sm font-bold text-slate-500"><CheckCircle className="w-4 h-4 mr-2 text-emerald-500" /> Extra Luggage Space</li>
-                  <li className="flex items-center text-sm font-bold text-slate-500"><CheckCircle className="w-4 h-4 mr-2 text-emerald-500" /> Ideal for Airport Runs</li>
-                </ul>
-                <div className="pt-6 border-t border-slate-200 flex justify-between items-center">
-                  <span className="text-xs font-black uppercase tracking-widest text-emerald-600">Starting at ₦5,000</span>
-                  <Link to="/auth" className="font-black text-xs uppercase tracking-widest flex items-center hover:text-emerald-600">Book <ChevronRight className="w-4 h-4 ml-1" /></Link>
-                </div>
+            {/* Comfort */}
+            <div className="bg-slate-50 p-8 rounded-[40px] border border-slate-100 hover:border-indigo-200 transition-all group">
+              <div className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform">
+                <Zap className="w-7 h-7" />
               </div>
+              <h2 className="text-2xl font-black text-slate-900 mb-3">Comfort</h2>
+              <p className="text-slate-600 text-sm font-medium leading-relaxed mb-6">
+                Newer cars with extra legroom. For when you need a more relaxed journey.
+              </p>
+              <ul className="space-y-2 mb-6">
+                <li className="flex items-center text-xs font-bold text-slate-500"><CheckCircle className="w-3 h-3 mr-2 text-emerald-500" /> Extra Legroom</li>
+                <li className="flex items-center text-xs font-bold text-slate-500"><CheckCircle className="w-3 h-3 mr-2 text-emerald-500" /> Top-rated Drivers</li>
+              </ul>
+              <div className="pt-6 border-t border-slate-200 flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase tracking-widest text-indigo-600">From ₦2,500</span>
+                <Link to="/auth" className="font-black text-[10px] uppercase tracking-widest flex items-center hover:text-indigo-600">Book <ChevronRight className="w-3 h-3 ml-1" /></Link>
+              </div>
+            </div>
 
-              <div className="bg-slate-50 p-10 rounded-[48px] border border-slate-100 hover:border-blue-200 transition-all">
-                <div className="w-16 h-16 bg-orange-600 text-white rounded-2xl flex items-center justify-center mb-8 shadow-xl">
-                  <Car className="w-8 h-8" />
-                </div>
-                <h2 className="text-3xl font-black text-slate-900 mb-4">Nano Bike</h2>
-                <p className="text-slate-600 font-medium leading-relaxed mb-6">
-                  The ultimate traffic buster. Fast, agile, and incredibly affordable. Get through the city's tightest spots in record time.
-                </p>
-                <ul className="space-y-3 mb-8">
-                  <li className="flex items-center text-sm font-bold text-slate-500"><CheckCircle className="w-4 h-4 mr-2 text-emerald-500" /> Beat the Gridlock</li>
-                  <li className="flex items-center text-sm font-bold text-slate-500"><CheckCircle className="w-4 h-4 mr-2 text-emerald-500" /> Helmet Provided</li>
-                  <li className="flex items-center text-sm font-bold text-slate-500"><CheckCircle className="w-4 h-4 mr-2 text-emerald-500" /> Solo Travel Optimized</li>
-                </ul>
-                <div className="pt-6 border-t border-slate-200 flex justify-between items-center">
-                  <span className="text-xs font-black uppercase tracking-widest text-orange-600">Starting at ₦500</span>
-                  <Link to="/auth" className="font-black text-xs uppercase tracking-widest flex items-center hover:text-orange-600">Book <ChevronRight className="w-4 h-4 ml-1" /></Link>
-                </div>
+            {/* Luxury */}
+            <div className="bg-slate-50 p-8 rounded-[40px] border border-slate-100 hover:border-slate-900 transition-all group">
+              <div className="w-14 h-14 bg-slate-900 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform">
+                <Star className="w-7 h-7" />
+              </div>
+              <h2 className="text-2xl font-black text-slate-900 mb-3">Luxury</h2>
+              <p className="text-slate-600 text-sm font-medium leading-relaxed mb-6">
+                Premium high-end vehicles. Arrive in style for your most important meetings.
+              </p>
+              <ul className="space-y-2 mb-6">
+                <li className="flex items-center text-xs font-bold text-slate-500"><CheckCircle className="w-3 h-3 mr-2 text-emerald-500" /> High-end Sedans</li>
+                <li className="flex items-center text-xs font-bold text-slate-500"><CheckCircle className="w-3 h-3 mr-2 text-emerald-500" /> VIP Experience</li>
+              </ul>
+              <div className="pt-6 border-t border-slate-200 flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-900">From ₦5,000</span>
+                <Link to="/auth" className="font-black text-[10px] uppercase tracking-widest flex items-center hover:text-slate-900">Book <ChevronRight className="w-3 h-3 ml-1" /></Link>
+              </div>
+            </div>
+
+            {/* Bus */}
+            <div className="bg-slate-50 p-8 rounded-[40px] border border-slate-100 hover:border-emerald-200 transition-all group">
+              <div className="w-14 h-14 bg-emerald-600 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform">
+                <Bus className="w-7 h-7" />
+              </div>
+              <h2 className="text-2xl font-black text-slate-900 mb-3">Bus</h2>
+              <p className="text-slate-600 text-sm font-medium leading-relaxed mb-6">
+                Group travel made easy. Spacious vans and buses for your team or family.
+              </p>
+              <ul className="space-y-2 mb-6">
+                <li className="flex items-center text-xs font-bold text-slate-500"><CheckCircle className="w-3 h-3 mr-2 text-emerald-500" /> Seats up to 14</li>
+                <li className="flex items-center text-xs font-bold text-slate-500"><CheckCircle className="w-3 h-3 mr-2 text-emerald-500" /> Group Optimized</li>
+              </ul>
+              <div className="pt-6 border-t border-slate-200 flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase tracking-widest text-emerald-600">From ₦3,500</span>
+                <Link to="/auth" className="font-black text-[10px] uppercase tracking-widest flex items-center hover:text-emerald-600">Book <ChevronRight className="w-3 h-3 ml-1" /></Link>
+              </div>
+            </div>
+
+            {/* Truck */}
+            <div className="bg-slate-50 p-8 rounded-[40px] border border-slate-100 hover:border-amber-200 transition-all group">
+              <div className="w-14 h-14 bg-amber-600 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform">
+                <Truck className="w-7 h-7" />
+              </div>
+              <h2 className="text-2xl font-black text-slate-900 mb-3">Truck</h2>
+              <p className="text-slate-600 text-sm font-medium leading-relaxed mb-6">
+                Hauling and logistics. Reliable trucks for moving your goods safely.
+              </p>
+              <ul className="space-y-2 mb-6">
+                <li className="flex items-center text-xs font-bold text-slate-500"><CheckCircle className="w-3 h-3 mr-2 text-emerald-500" /> Heavy Duty</li>
+                <li className="flex items-center text-xs font-bold text-slate-500"><CheckCircle className="w-3 h-3 mr-2 text-emerald-500" /> Logistics Support</li>
+              </ul>
+              <div className="pt-6 border-t border-slate-200 flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase tracking-widest text-amber-600">From ₦8,000</span>
+                <Link to="/auth" className="font-black text-[10px] uppercase tracking-widest flex items-center hover:text-amber-600">Book <ChevronRight className="w-3 h-3 ml-1" /></Link>
+              </div>
+            </div>
+
+            {/* Tricycle */}
+            <div className="bg-slate-50 p-8 rounded-[40px] border border-slate-100 hover:border-orange-200 transition-all group">
+              <div className="w-14 h-14 bg-orange-600 text-white rounded-2xl flex items-center justify-center mb-6 shadow-lg group-hover:scale-110 transition-transform">
+                <Bike className="w-7 h-7" />
+              </div>
+              <h2 className="text-2xl font-black text-slate-900 mb-3">Tricycle</h2>
+              <p className="text-slate-600 text-sm font-medium leading-relaxed mb-6">
+                Fast and agile. The best way to beat traffic in busy urban areas.
+              </p>
+              <ul className="space-y-2 mb-6">
+                <li className="flex items-center text-xs font-bold text-slate-500"><CheckCircle className="w-3 h-3 mr-2 text-emerald-500" /> Beat the Traffic</li>
+                <li className="flex items-center text-xs font-bold text-slate-500"><CheckCircle className="w-3 h-3 mr-2 text-emerald-500" /> Highly Affordable</li>
+              </ul>
+              <div className="pt-6 border-t border-slate-200 flex justify-between items-center">
+                <span className="text-[10px] font-black uppercase tracking-widest text-orange-600">From ₦800</span>
+                <Link to="/auth" className="font-black text-[10px] uppercase tracking-widest flex items-center hover:text-orange-600">Book <ChevronRight className="w-3 h-3 ml-1" /></Link>
               </div>
             </div>
           </div>

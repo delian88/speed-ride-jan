@@ -11,10 +11,12 @@ export enum RideStatus {
 }
 
 export enum VehicleType {
+  BUS = 'BUS',
+  TRUCK = 'TRUCK',
   ECONOMY = 'ECONOMY',
-  PREMIUM = 'PREMIUM',
-  XL = 'XL',
-  BIKE = 'BIKE'
+  COMFORT = 'COMFORT',
+  LUXURY = 'LUXURY',
+  TRICYCLE = 'TRICYCLE'
 }
 
 export interface User {

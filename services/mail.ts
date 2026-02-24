@@ -12,6 +12,7 @@ interface MailOptions {
 
 const SMTP_CONFIG = {
   Host: "smtp.gmail.com",
+  Port: 587,
   Username: "taiwodele88@gmail.com",
   Password: "ucbznlbhnbogwuer", 
   From: "taiwodele88@gmail.com"

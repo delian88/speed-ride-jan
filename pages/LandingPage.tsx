@@ -7,7 +7,8 @@ import {
   Smartphone, Award, Users, HelpCircle, ArrowRight,
   ShieldCheck, Map, Wallet, MessageSquare,
   Globe, ShieldAlert, Cpu, BarChart3, TrendingUp,
-  User as UserIcon, Menu, X, Play, Apple, Download
+  User as UserIcon, Menu, X, Play, Apple, Download,
+  Truck, Bus, Bike
 } from 'lucide-react';
 import Logo from '../components/Logo';
 
@@ -138,10 +139,12 @@ const LandingPage: React.FC = () => {
           
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
             {[
-              { title: 'Economy Plus', icon: Smartphone, desc: 'Smart, efficient, and affordable city hops.', price: 'Low', feat: 'Instant Pickup' },
-              { title: 'Tesla Premium', icon: Zap, desc: 'Eco-luxury with full self-driving support.', price: 'Premium', feat: 'In-ride Wi-Fi' },
-              { title: 'Speed XL', icon: Users, desc: 'Spacious vans for up to 8 passengers.', price: 'Medium', feat: 'Large Luggage' },
-              { title: 'Nano Bike', icon: Car, desc: 'Beat the gridlock with ultra-fast couriers.', price: 'Ultra-Low', feat: 'Heavy Traffic' }
+              { title: 'Economy', icon: Smartphone, desc: 'Smart, efficient, and affordable city hops.', price: 'Low', feat: 'Instant Pickup' },
+              { title: 'Comfort', icon: Zap, desc: 'Newer cars with extra legroom and top drivers.', price: 'Medium', feat: 'Extra Space' },
+              { title: 'Luxury', icon: Star, desc: 'Premium high-end vehicles for VIP travel.', price: 'Premium', feat: 'Elite Service' },
+              { title: 'Bus', icon: Bus, desc: 'Spacious vans for groups up to 14 people.', price: 'Medium', feat: 'Group Travel' },
+              { title: 'Truck', icon: Truck, desc: 'Reliable logistics and hauling support.', price: 'High', feat: 'Heavy Duty' },
+              { title: 'Tricycle', icon: Bike, desc: 'Fast, agile, and incredibly affordable.', price: 'Ultra-Low', feat: 'Beat Traffic' }
             ].map((item, i) => (
               <div key={i} className="group p-6 md:p-8 rounded-[40px] bg-slate-50 border border-slate-100 hover:bg-slate-900 hover:text-white transition-all duration-500 cursor-pointer hover:-translate-y-4">
                 <div className="w-14 h-14 md:w-16 md:h-16 bg-white rounded-2xl flex items-center justify-center mb-6 shadow-sm group-hover:bg-blue-600 group-hover:rotate-12 transition-all">

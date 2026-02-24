@@ -3,7 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { 
   MapPin, Navigation, Car, Zap, CheckCircle, 
-  Shield, ShieldCheck, Loader2, Plus, X, CreditCard, Wallet, LogOut, Menu, History, ExternalLink, RefreshCw
+  Shield, ShieldCheck, Loader2, Plus, X, CreditCard, Wallet, LogOut, Menu, History, ExternalLink, RefreshCw,
+  Truck, Bus, Bike
 } from 'lucide-react';
 import { useApp } from '../App';
 import { RideStatus, VehicleType, RideRequest } from '../types';
@@ -266,8 +267,16 @@ const RiderExplore: React.FC<{ onOpenTopUp: () => void }> = ({ onOpenTopUp }) =>
   const [activeRide, setActiveRide] = useState<RideRequest | null>(null);
 
   const calculateFare = (type: VehicleType) => {
-    const base = type === VehicleType.ECONOMY ? 1200 : type === VehicleType.PREMIUM ? 3500 : 5000;
-    return base + 4500;
+    const rates: Record<VehicleType, number> = {
+      [VehicleType.ECONOMY]: 1200,
+      [VehicleType.COMFORT]: 2500,
+      [VehicleType.LUXURY]: 5000,
+      [VehicleType.BUS]: 3500,
+      [VehicleType.TRUCK]: 8000,
+      [VehicleType.TRICYCLE]: 800
+    };
+    const base = rates[type] || 1200;
+    return base + 4500; // Adding a fixed distance-based mock fare
   };
 
   const handleBook = async () => {
@@ -389,12 +398,19 @@ const RiderExplore: React.FC<{ onOpenTopUp: () => void }> = ({ onOpenTopUp }) =>
             </div>
 
             <div className="grid grid-cols-3 gap-4">
-              {[VehicleType.ECONOMY, VehicleType.PREMIUM, VehicleType.XL].map(type => (
-                <button key={type} onClick={() => setSelectedType(type)} className={`p-5 rounded-[36px] border-2 transition-all flex flex-col items-center justify-center relative overflow-hidden ${selectedType === type ? 'border-blue-600 bg-blue-50/50 shadow-2xl shadow-blue-600/10' : 'border-slate-50 bg-white hover:border-slate-200'}`}>
+              {[
+                { type: VehicleType.ECONOMY, icon: Car },
+                { type: VehicleType.COMFORT, icon: Car },
+                { type: VehicleType.LUXURY, icon: Car },
+                { type: VehicleType.BUS, icon: Bus },
+                { type: VehicleType.TRUCK, icon: Truck },
+                { type: VehicleType.TRICYCLE, icon: Bike },
+              ].map(({ type, icon: Icon }) => (
+                <button key={type} onClick={() => setSelectedType(type)} className={`p-4 rounded-[32px] border-2 transition-all flex flex-col items-center justify-center relative overflow-hidden ${selectedType === type ? 'border-blue-600 bg-blue-50/50 shadow-2xl shadow-blue-600/10' : 'border-slate-50 bg-white hover:border-slate-200'}`}>
                   {selectedType === type && <div className="absolute top-0 right-0 bg-blue-600 p-1 rounded-bl-xl"><CheckCircle className="w-3 h-3 text-white" /></div>}
-                  <Car className={`w-9 h-9 mb-3 ${selectedType === type ? 'text-blue-600 scale-110' : 'text-slate-300'} transition-transform`} />
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-1">{type}</p>
-                  <p className="text-sm font-black text-slate-900">₦{calculateFare(type).toLocaleString()}</p>
+                  <Icon className={`w-7 h-7 mb-2 ${selectedType === type ? 'text-blue-600 scale-110' : 'text-slate-300'} transition-transform`} />
+                  <p className="text-[8px] font-black uppercase tracking-[0.1em] text-slate-400 mb-1">{type}</p>
+                  <p className="text-xs font-black text-slate-900">₦{calculateFare(type).toLocaleString()}</p>
                 </button>
               ))}
             </div>

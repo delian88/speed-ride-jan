@@ -15,7 +15,7 @@ CREATE TABLE users (
     balance DECIMAL(15, 2) DEFAULT 0.0,
     is_online BOOLEAN DEFAULT FALSE,
     is_verified BOOLEAN DEFAULT FALSE,
-    vehicle_type VARCHAR(20) CHECK (vehicle_type IN ('ECONOMY', 'PREMIUM', 'XL', 'BIKE')),
+    vehicle_type VARCHAR(20) CHECK (vehicle_type IN ('BUS', 'TRUCK', 'ECONOMY', 'COMFORT', 'LUXURY', 'TRICYCLE')),
     vehicle_model VARCHAR(100),
     plate_number VARCHAR(20),
     license_doc TEXT, -- Base64 or Image URL

@@ -22,7 +22,7 @@ const MOCK_DRIVER: Driver = {
   avatar: 'https://picsum.photos/seed/sarah/200',
   rating: 4.9,
   balance: 124050.50,
-  vehicleType: VehicleType.PREMIUM,
+  vehicleType: VehicleType.LUXURY,
   vehicleModel: 'Tesla Model 3',
   plateNumber: 'SR-777',
   isOnline: true,

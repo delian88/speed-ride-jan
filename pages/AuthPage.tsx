@@ -368,17 +368,29 @@ const AuthPage: React.FC = () => {
             <input name="password" type="password" placeholder="Password" required onChange={handleInputChange} className="w-full px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none focus:ring-2 focus:ring-blue-600 font-bold text-sm" />
             
             {role === 'DRIVER' && (
-              <div className="grid grid-cols-2 gap-4 pt-2">
-                <input name="vehicleModel" placeholder="Vehicle" required onChange={handleInputChange} className="px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-xs" />
-                <input name="plateNumber" placeholder="Plate" required onChange={handleInputChange} className="px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-xs" />
-                <label className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed bg-slate-50 cursor-pointer text-[9px] font-black uppercase tracking-widest text-slate-400">
-                  <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'licenseDoc')} />
-                  {formData.licenseDoc ? 'LICENSE OK' : 'LICENSE'}
-                </label>
-                <label className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed bg-slate-50 cursor-pointer text-[9px] font-black uppercase tracking-widest text-slate-400">
-                  <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'ninDoc')} />
-                  {formData.ninDoc ? 'NIN OK' : 'NIN ID'}
-                </label>
+              <div className="space-y-4 pt-2">
+                <div className="grid grid-cols-2 gap-4">
+                  <input name="vehicleModel" placeholder="Vehicle Model" required onChange={handleInputChange} className="px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-xs" />
+                  <input name="plateNumber" placeholder="Plate Number" required onChange={handleInputChange} className="px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-xs" />
+                </div>
+                <select name="vehicleType" required onChange={handleInputChange} className="w-full px-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl outline-none font-bold text-xs appearance-none">
+                  <option value="ECONOMY">ECONOMY</option>
+                  <option value="COMFORT">COMFORT</option>
+                  <option value="LUXURY">LUXURY</option>
+                  <option value="BUS">BUS</option>
+                  <option value="TRUCK">TRUCK</option>
+                  <option value="TRICYCLE">TRICYCLE</option>
+                </select>
+                <div className="grid grid-cols-2 gap-4">
+                  <label className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed bg-slate-50 cursor-pointer text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'licenseDoc')} />
+                    {formData.licenseDoc ? 'LICENSE OK' : 'LICENSE'}
+                  </label>
+                  <label className="flex flex-col items-center justify-center p-3 rounded-2xl border-2 border-dashed bg-slate-50 cursor-pointer text-[9px] font-black uppercase tracking-widest text-slate-400">
+                    <input type="file" className="hidden" onChange={(e) => handleFileUpload(e, 'ninDoc')} />
+                    {formData.ninDoc ? 'NIN OK' : 'NIN ID'}
+                  </label>
+                </div>
               </div>
             )}
             <button type="submit" className="w-full bg-blue-600 text-white font-black py-4 rounded-2xl hover:bg-blue-700 transition shadow-xl uppercase tracking-widest text-xs mt-2" disabled={isLoading}>{isLoading ? "CREATING..." : "SIGN UP"}</button>

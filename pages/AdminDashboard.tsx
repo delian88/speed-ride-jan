@@ -206,9 +206,12 @@ const AdminMainDashboard: React.FC = () => {
   ];
 
   const rideRequestData = [
-    { name: 'Economy', value: 1205, color: '#3b82f6' },
-    { name: 'Premium', value: 170, color: '#10b981' },
-    { name: 'XL', value: 77, color: '#f59e0b' },
+    { name: 'ECONOMY', value: 1205, color: '#3b82f6' },
+    { name: 'COMFORT', value: 450, color: '#6366f1' },
+    { name: 'LUXURY', value: 170, color: '#0f172a' },
+    { name: 'BUS', value: 280, color: '#10b981' },
+    { name: 'TRUCK', value: 120, color: '#f59e0b' },
+    { name: 'TRICYCLE', value: 550, color: '#f97316' },
   ];
 
   return (
