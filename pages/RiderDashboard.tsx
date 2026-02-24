@@ -276,7 +276,7 @@ const RiderExplore: React.FC<{ onOpenTopUp: () => void }> = ({ onOpenTopUp }) =>
     try {
       const fare = calculateFare(selectedType);
       if (currentUser.balance < fare) {
-        showToast("Insufficient Balance. Fund your neural wallet.", "error");
+        showToast("Insufficient Balance. Fund your wallet.", "error");
         onOpenTopUp();
         setIsBooking(false);
         return;

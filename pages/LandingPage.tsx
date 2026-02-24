@@ -24,12 +24,12 @@ const LandingPage: React.FC = () => {
               <Logo className="h-12 md:h-16 w-auto group-hover:scale-105 transition-transform" />
             </Link>
             
-            {/* Desktop Nav - Updated to open in new tab */}
+            {/* Desktop Nav - Updated to open in same tab */}
             <div className="hidden lg:flex space-x-10 font-bold text-slate-600">
-              <a href="#services" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">Fleet</a>
-              <a href="#safety" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">Safety</a>
-              <a href="#opportunity" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">Drive</a>
-              <a href="#how-it-works" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition-colors">How it Works</a>
+              <Link to="/fleet" className="hover:text-blue-600 transition-colors">Fleet</Link>
+              <Link to="/safety" className="hover:text-blue-600 transition-colors">Safety</Link>
+              <Link to="/drive" className="hover:text-blue-600 transition-colors">Drive</Link>
+              <Link to="/how-it-works" className="hover:text-blue-600 transition-colors">How it Works</Link>
             </div>
 
             <div className="flex items-center space-x-4 md:space-x-6">
@@ -51,10 +51,10 @@ const LandingPage: React.FC = () => {
         {/* Mobile Menu */}
         {isMobileMenuOpen && (
           <div className="lg:hidden absolute top-20 left-0 w-full bg-white border-b border-slate-100 p-6 space-y-4 shadow-2xl animate-in slide-in-from-top duration-300">
-            <a href="#services" target="_blank" rel="noopener noreferrer" onClick={() => setIsMobileMenuOpen(false)} className="block font-bold text-slate-600 hover:text-blue-600">Fleet</a>
-            <a href="#safety" target="_blank" rel="noopener noreferrer" onClick={() => setIsMobileMenuOpen(false)} className="block font-bold text-slate-600 hover:text-blue-600">Safety</a>
-            <a href="#opportunity" target="_blank" rel="noopener noreferrer" onClick={() => setIsMobileMenuOpen(false)} className="block font-bold text-slate-600 hover:text-blue-600">Drive</a>
-            <a href="#how-it-works" target="_blank" rel="noopener noreferrer" onClick={() => setIsMobileMenuOpen(false)} className="block font-bold text-slate-600 hover:text-blue-600">How it Works</a>
+            <Link to="/fleet" onClick={() => setIsMobileMenuOpen(false)} className="block font-bold text-slate-600 hover:text-blue-600">Fleet</Link>
+            <Link to="/safety" onClick={() => setIsMobileMenuOpen(false)} className="block font-bold text-slate-600 hover:text-blue-600">Safety</Link>
+            <Link to="/drive" onClick={() => setIsMobileMenuOpen(false)} className="block font-bold text-slate-600 hover:text-blue-600">Drive</Link>
+            <Link to="/how-it-works" onClick={() => setIsMobileMenuOpen(false)} className="block font-bold text-slate-600 hover:text-blue-600">How it Works</Link>
             <Link to="/auth" onClick={() => setIsMobileMenuOpen(false)} className="block font-bold text-slate-600 hover:text-blue-600">Sign In</Link>
           </div>
         )}
@@ -82,9 +82,9 @@ const LandingPage: React.FC = () => {
               <Link to="/auth" className="group flex items-center justify-center bg-slate-900 text-white px-8 py-4 md:px-10 md:py-5 rounded-2xl font-bold hover:bg-blue-600 hover:scale-105 active:scale-95 transition-all shadow-2xl shadow-slate-300">
                 Start My Journey <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition" />
               </Link>
-              <a href="#opportunity" target="_blank" rel="noopener noreferrer" className="flex items-center justify-center border-2 border-slate-200 text-slate-900 px-8 py-4 md:px-10 md:py-5 rounded-2xl font-bold hover:border-slate-900 hover:bg-slate-50 transition-all">
+              <Link to="/drive" className="flex items-center justify-center border-2 border-slate-200 text-slate-900 px-8 py-4 md:px-10 md:py-5 rounded-2xl font-bold hover:border-slate-900 hover:bg-slate-50 transition-all">
                 Partner with Us
-              </a>
+              </Link>
             </div>
           </div>
 
@@ -315,7 +315,7 @@ const LandingPage: React.FC = () => {
             <div className="space-y-6">
               <h4 className="text-slate-900 font-black text-xs uppercase tracking-[0.2em]">Product</h4>
               <ul className="space-y-4 text-sm font-bold text-slate-500">
-                <li><a href="#services" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition">Fleet Options</a></li>
+                <li><Link to="/fleet" className="hover:text-blue-600 transition">Fleet Options</Link></li>
                 <li><a href="#" className="hover:text-blue-600 transition">Price Estimates</a></li>
                 <li><a href="#" className="hover:text-blue-600 transition">Business Travel</a></li>
                 <li><a href="#" className="hover:text-blue-600 transition">Gift Cards</a></li>
@@ -325,9 +325,9 @@ const LandingPage: React.FC = () => {
               <h4 className="text-slate-900 font-black text-xs uppercase tracking-[0.2em]">Company</h4>
               <ul className="space-y-4 text-sm font-bold text-slate-500">
                 <li><a href="#" className="hover:text-blue-600 transition">About Us</a></li>
-                <li><a href="#opportunity" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 transition">Careers</a></li>
+                <li><Link to="/drive" className="hover:text-blue-600 transition">Careers</Link></li>
                 <li><a href="#" className="hover:text-blue-600 transition">Press Center</a></li>
-                <li><a href="#" className="hover:text-blue-600 transition">Safety Center</a></li>
+                <li><Link to="/safety" className="hover:text-blue-600 transition">Safety Center</Link></li>
               </ul>
             </div>
             <div className="space-y-6">

@@ -12,6 +12,10 @@ import AuthPage from './pages/AuthPage';
 import RiderDashboard from './pages/RiderDashboard';
 import DriverDashboard from './pages/DriverDashboard';
 import AdminDashboard from './pages/AdminDashboard';
+import FleetPage from './pages/FleetPage';
+import SafetyPage from './pages/SafetyPage';
+import DrivePage from './pages/DrivePage';
+import HowItWorksPage from './pages/HowItWorksPage';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -125,7 +129,7 @@ const App: React.FC = () => {
       <div className="w-48 h-1.5 bg-slate-100 rounded-full overflow-hidden relative">
         <div className="absolute inset-0 bg-blue-600 animate-loading-bar"></div>
       </div>
-      <p className="mt-6 text-[10px] font-black uppercase tracking-[0.4em] text-slate-300">Synchronizing Neural Core...</p>
+      <p className="mt-6 text-[10px] font-black uppercase tracking-[0.4em] text-slate-300">loading .....</p>
     </div>
   );
 
@@ -176,6 +180,10 @@ const App: React.FC = () => {
 
           <Routes>
             <Route path="/" element={<LandingPage />} />
+            <Route path="/fleet" element={<FleetPage />} />
+            <Route path="/safety" element={<SafetyPage />} />
+            <Route path="/drive" element={<DrivePage />} />
+            <Route path="/how-it-works" element={<HowItWorksPage />} />
             <Route path="/auth" element={<AuthPage />} />
             <Route path="/rider/*" element={isAuthenticated && currentUser?.role === 'RIDER' ? <RiderDashboard /> : <Navigate to="/auth" />} />
             <Route path="/driver/*" element={isAuthenticated && currentUser?.role === 'DRIVER' ? <DriverDashboard /> : <Navigate to="/auth" />} />

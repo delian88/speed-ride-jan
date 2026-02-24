@@ -69,7 +69,7 @@ export const sendOtpEmail = async (email: string, otp: string) => {
     <div style="font-family: Arial, sans-serif; padding: 40px; text-align: center; background-color: #f8fafc;">
       <div style="background-color: white; padding: 40px; border-radius: 32px; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); max-width: 400px; margin: auto; border: 1px solid #e2e8f0;">
         <h1 style="margin: 0; color: #0f172a; font-size: 24px; font-weight: 800; letter-spacing: -0.025em;">Secure Verification</h1>
-        <p style="color: #64748b; margin: 20px 0; font-size: 14px;">Use the neural access code below to finalize your registration.</p>
+        <p style="color: #64748b; margin: 20px 0; font-size: 14px;">Use the access code below to finalize your registration.</p>
         <div style="background: #eff6ff; padding: 24px; border-radius: 20px; border: 2px dashed #3b82f6; margin: 30px 0;">
           <span style="font-size: 36px; font-weight: 900; letter-spacing: 8px; color: #2563eb; font-family: monospace;">${otp}</span>
         </div>
