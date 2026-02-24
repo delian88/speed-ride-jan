@@ -64,7 +64,7 @@ const ContactPage: React.FC = () => {
                   <div>
                     <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Visit Us</p>
                     <p className="text-2xl font-black text-slate-900 tracking-tight leading-tight">
-                      Minna, Niger State, <br/> Nigeria
+                      Trade Fair Complex, <br/> Minna, Niger State
                     </p>
                   </div>
                 </div>
