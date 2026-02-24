@@ -145,7 +145,7 @@ const TopUpModal: React.FC<{ isOpen: boolean, onClose: () => void, onFunded: () 
           billing_zipcode: "234",
           items: [
             {
-              description: "Neural Wallet Credit Injection",
+              description: "Wallet Credit Injection",
               quantity: "1",
               unit_price: val.toString(),
               meta_data: ""
@@ -448,7 +448,7 @@ const RiderDashboard: React.FC = () => {
         
         <div className="flex items-center space-x-8">
            <div className="text-right hidden sm:block">
-              <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.4em] mb-1 opacity-80">Neural Ledger</p>
+              <p className="text-[10px] font-black text-blue-500 uppercase tracking-[0.4em] mb-1 opacity-80">Ledger</p>
               <div className="flex items-center justify-end space-x-2">
                  <p className={`text-2xl font-black ${currentUser?.balance === 0 ? 'text-red-500' : 'text-white'}`}>₦{currentUser?.balance.toLocaleString()}</p>
               </div>

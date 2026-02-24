@@ -408,7 +408,7 @@ const AuthPage: React.FC = () => {
               <div className="flex items-center space-x-4 mb-4">
                 <div className="p-3 bg-blue-600 rounded-2xl"><Mail className="w-6 h-6" /></div>
                 <div>
-                   <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Neural Transmission Intercepted</p>
+                   <p className="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em]">Transmission Intercepted</p>
                    <p className="text-sm font-black">{interceptedMail.subject}</p>
                 </div>
               </div>

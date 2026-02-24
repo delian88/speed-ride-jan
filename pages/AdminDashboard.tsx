@@ -46,7 +46,7 @@ const InfrastructureView: React.FC = () => {
     <div className="p-4 md:p-8 space-y-8 bg-[#f8fafc] h-full overflow-y-auto custom-scrollbar animate-in fade-in duration-500">
        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
-          <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Neural Infrastructure</h2>
+          <h2 className="text-3xl font-black text-slate-900 tracking-tighter uppercase">Infrastructure</h2>
           <p className="text-slate-500 font-bold text-xs uppercase tracking-widest mt-1">Managed Core v4.2.0</p>
         </div>
         <div className={`flex items-center space-x-3 px-6 py-3 rounded-2xl border-2 ${status.type === 'PRODUCTION' ? 'bg-emerald-50 border-emerald-100 text-emerald-700' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>
@@ -163,7 +163,7 @@ const InfrastructureView: React.FC = () => {
                   <span className="text-[10px] font-black uppercase tracking-widest">Verification Shell</span>
                </div>
                <div className="space-y-3 font-mono text-[11px]">
-                  <p className="text-emerald-600 font-bold"># Checking Neural Infrastructure...</p>
+                  <p className="text-emerald-600 font-bold"># Checking Infrastructure...</p>
                   {status.type === 'PRODUCTION' ? (
                      <>
                         <p className="text-slate-600 font-medium">OK: Cloud Engine Detected (PostgreSQL)</p>

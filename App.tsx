@@ -95,7 +95,7 @@ const App: React.FC = () => {
     setCurrentUser(userWithToken);
     setIsAuthenticated(true);
     localStorage.setItem('speedride_session', JSON.stringify(userWithToken));
-    showToast(`Neural Link Established. Welcome, ${userWithToken.name}`, 'success');
+    showToast(`Link Established. Welcome, ${userWithToken.name}`, 'success');
   };
 
   const logout = () => {

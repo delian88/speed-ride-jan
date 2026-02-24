@@ -6,8 +6,8 @@ interface MailOptions {
 }
 
 /**
- * SPEEDRIDE 2026 | Neural Mail Service
- * Production Infrastructure: SmtpJS (Real Delivery) + Neural Virtual Interceptor (Instant UX)
+ * SPEEDRIDE 2026 | Mail Service
+ * Production Infrastructure: SmtpJS (Real Delivery) + Virtual Interceptor (Instant UX)
  */
 
 const SMTP_CONFIG = {
@@ -55,7 +55,7 @@ export const sendWelcomeEmail = async ({ email, name, role }: MailOptions) => {
       ${isDriver 
         ? '<p style="background: #f8fafc; padding: 20px; border-radius: 12px; border-left: 4px solid #2563eb;">Our safety team is currently reviewing your uploaded documents. You will receive a notification once your node is verified for live dispatch.</p>' 
         : '<p>You are now connected to the most advanced mobility grid. Your first premium ride is just a tap away.</p>'}
-      <p style="margin-top: 40px; font-size: 12px; color: #94a3b8;">SpeedRide Mobility Inc. | Neural Core Transmission</p>
+      <p style="margin-top: 40px; font-size: 12px; color: #94a3b8;">SpeedRide Mobility Inc. | Core Transmission</p>
     </div>
   `;
 
@@ -78,7 +78,7 @@ export const sendOtpEmail = async (email: string, otp: string) => {
     </div>
   `;
 
-  triggerVirtualInterceptor(subject, `Neural OTP Transmission: ${otp}`, otp);
+  triggerVirtualInterceptor(subject, `OTP Transmission: ${otp}`, otp);
   return await dispatchEmail(email, subject, body);
 };
 
