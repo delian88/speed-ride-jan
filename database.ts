@@ -19,6 +19,7 @@ const mockDb = {
   rides: [] as any[],
   transactions: [] as any[],
   invoices: [] as any[],
+  verifications: [] as any[],
   settings: { baseFare: 1200, pricePerKm: 450, commission: 15, maintenanceMode: false }
 };
 
@@ -30,6 +31,7 @@ const loadMock = async () => {
     mockDb.rides = data.rides || [];
     mockDb.transactions = data.transactions || [];
     mockDb.invoices = data.invoices || [];
+    mockDb.verifications = data.verifications || [];
     mockDb.settings = data.settings || mockDb.settings;
   } else {
     const adminHash = await bcrypt.hash('admin123', SALT_ROUNDS);
@@ -166,6 +168,13 @@ export const db = {
         )`;
       
       await sql`CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value JSONB)`;
+      
+      await sql`
+        CREATE TABLE IF NOT EXISTS verifications (
+          email TEXT PRIMARY KEY,
+          otp TEXT NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )`;
       
       const count = await sql`SELECT count(*) FROM users`;
       if (parseInt(count[0].count) === 0) {
@@ -432,6 +441,61 @@ export const db = {
       if (isMock) return mockDb.transactions.filter(t => t.user_id === uid).reverse();
       const sql = getSql();
       return await sql`SELECT * FROM transactions WHERE user_id = ${uid} ORDER BY created_at DESC`;
+    }
+  },
+
+  verifications: {
+    create: async (email: string, otp: string) => {
+      if (isMock) {
+        const idx = mockDb.verifications.findIndex(v => v.email === email);
+        if (idx > -1) mockDb.verifications[idx] = { email, otp, created_at: new Date().toISOString() };
+        else mockDb.verifications.push({ email, otp, created_at: new Date().toISOString() });
+        saveMock();
+        return true;
+      }
+      const sql = getSql();
+      await sql`
+        INSERT INTO verifications (email, otp) 
+        VALUES (${email}, ${otp}) 
+        ON CONFLICT (email) DO UPDATE SET otp = EXCLUDED.otp, created_at = CURRENT_TIMESTAMP
+      `;
+      return true;
+    },
+    get: async (email: string) => {
+      if (isMock) {
+        const v = mockDb.verifications.find(x => x.email === email);
+        if (!v) return null;
+        // Simple 10 min expiry check for mock
+        const diff = (new Date().getTime() - new Date(v.created_at).getTime()) / 1000 / 60;
+        if (diff > 10) {
+          mockDb.verifications = mockDb.verifications.filter(x => x.email !== email);
+          saveMock();
+          return null;
+        }
+        return v.otp;
+      }
+      const sql = getSql();
+      const res = await sql`SELECT otp, created_at FROM verifications WHERE email = ${email}`;
+      if (!res[0]) return null;
+      
+      // Check expiry (10 mins)
+      const createdAt = new Date(res[0].created_at).getTime();
+      const now = new Date().getTime();
+      if (now - createdAt > 10 * 60 * 1000) {
+        await sql`DELETE FROM verifications WHERE email = ${email}`;
+        return null;
+      }
+      return res[0].otp;
+    },
+    delete: async (email: string) => {
+      if (isMock) {
+        mockDb.verifications = mockDb.verifications.filter(v => v.email !== email);
+        saveMock();
+        return true;
+      }
+      const sql = getSql();
+      await sql`DELETE FROM verifications WHERE email = ${email}`;
+      return true;
     }
   },
 

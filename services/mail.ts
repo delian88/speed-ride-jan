@@ -18,20 +18,41 @@ const SMTP_CONFIG = {
 };
 
 const dispatchEmail = async (to: string, subject: string, body: string) => {
-  try {
-    const Email = (window as any).Email;
-    if (!Email) return false;
-    const response = await Email.send({
-      ...SMTP_CONFIG,
-      To: to,
-      Subject: subject,
-      Body: body
-    });
-    return response === 'OK';
-  } catch (error) {
-    console.error("Mail Transmission Error:", error);
-    return false;
-  }
+  return new Promise<boolean>((resolve) => {
+    try {
+      const Email = (window as any).Email;
+      if (!Email) {
+        console.error("Mail Error: SmtpJS library not loaded in window context.");
+        resolve(false);
+        return;
+      }
+      
+      console.log(`Mail: Initiating transmission to ${to}...`);
+      
+      Email.send({
+        ...SMTP_CONFIG,
+        To: to,
+        Subject: subject,
+        Body: body
+      }).then((response: string) => {
+        if (response === 'OK') {
+          console.log("%c Mail: Transmission Successful (OK)", "color: #10b981; font-weight: bold;");
+          resolve(true);
+        } else {
+          console.error("Mail: Transmission Failed. Server Response:", response);
+          // If the response contains "The SMTP server requires a secure connection", 
+          // it usually means the Port or Host is incorrect for the relay.
+          resolve(false);
+        }
+      }).catch((err: any) => {
+        console.error("Mail: SmtpJS Promise Rejected:", err);
+        resolve(false);
+      });
+    } catch (error) {
+      console.error("Mail: Critical Exception during dispatch:", error);
+      resolve(false);
+    }
+  });
 };
 
 export const sendWelcomeEmail = async ({ email, name, role }: MailOptions) => {
@@ -55,6 +76,7 @@ export const sendWelcomeEmail = async ({ email, name, role }: MailOptions) => {
 };
 
 export const sendOtpEmail = async (email: string, otp: string) => {
+  console.log(`Mail: sendOtpEmail called for ${email}`);
   const subject = `[${otp}] SpeedRide Verification Code`;
   const body = `
     <div style="font-family: Arial, sans-serif; padding: 40px; text-align: center; background-color: #f8fafc;">

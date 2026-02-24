@@ -30,7 +30,6 @@ const AuthPage: React.FC = () => {
     ninDoc: ''
   });
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
-  const [correctOtp, setCorrectOtp] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   
@@ -121,8 +120,16 @@ const AuthPage: React.FC = () => {
     setError('');
     try {
       const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      setCorrectOtp(newOtp);
-      await sendOtpEmail(formData.email, newOtp);
+      
+      // Save to database temporarily
+      await db.verifications.create(formData.email, newOtp);
+      
+      const sent = await sendOtpEmail(formData.email, newOtp);
+      if (!sent) {
+        showToast("Mail delivery failed. Check console for details.", "error");
+        setIsLoading(false);
+        return;
+      }
       showToast("Verification code transmitted", "success");
       setView('OTP');
     } catch (err) {
@@ -145,8 +152,16 @@ const AuthPage: React.FC = () => {
       }
 
       const newOtp = Math.floor(100000 + Math.random() * 900000).toString();
-      setCorrectOtp(newOtp);
-      await sendResetEmail(formData.email, newOtp);
+      
+      // Save to database temporarily
+      await db.verifications.create(formData.email, newOtp);
+      
+      const sent = await sendResetEmail(formData.email, newOtp);
+      if (!sent) {
+        showToast("Recovery signal failed to send.", "error");
+        setIsLoading(false);
+        return;
+      }
       showToast("Recovery signal sent", "success");
       setView('RESET');
     } catch (err) {
@@ -159,8 +174,10 @@ const AuthPage: React.FC = () => {
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     const enteredOtp = otp.join('');
-    if (enteredOtp !== correctOtp) {
-      showToast("Security code invalid", "error");
+    const dbOtp = await db.verifications.get(formData.email);
+    
+    if (!dbOtp || enteredOtp !== dbOtp) {
+      showToast("Security code invalid or expired", "error");
       return;
     }
     if (formData.password !== formData.confirmPassword) {
@@ -172,6 +189,7 @@ const AuthPage: React.FC = () => {
     try {
       const success = await db.users.updatePassword(formData.email, formData.password);
       if (success) {
+        await db.verifications.delete(formData.email);
         showToast("Password synced successfully", "success");
         setView('SUCCESS');
         setTimeout(() => setView('LOGIN'), 3000);
@@ -183,8 +201,10 @@ const AuthPage: React.FC = () => {
 
   const handleVerifyOtp = async () => {
     const enteredOtp = otp.join('');
-    if (enteredOtp !== correctOtp) {
-      showToast("Verification failed", "error");
+    const dbOtp = await db.verifications.get(formData.email);
+
+    if (!dbOtp || enteredOtp !== dbOtp) {
+      showToast("Verification failed or code expired", "error");
       return;
     }
 
@@ -216,6 +236,7 @@ const AuthPage: React.FC = () => {
         });
       }
 
+      await db.verifications.delete(formData.email);
       showToast("Account Provisioned", "success");
       setView('SUCCESS');
       setTimeout(() => {
