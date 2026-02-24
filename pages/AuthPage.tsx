@@ -105,8 +105,31 @@ const AuthPage: React.FC = () => {
     }
   };
 
+  const validatePassword = (pass: string) => {
+    const minLength = 8;
+    const hasUpperCase = /[A-Z]/.test(pass);
+    const hasLowerCase = /[a-z]/.test(pass);
+    const hasNumber = /[0-9]/.test(pass);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(pass);
+
+    if (pass.length < minLength) return "Password must be at least 8 characters long.";
+    if (!hasUpperCase) return "Password must contain at least one uppercase letter.";
+    if (!hasLowerCase) return "Password must contain at least one lowercase letter.";
+    if (!hasNumber) return "Password must contain at least one number.";
+    if (!hasSpecialChar) return "Password must contain at least one special character.";
+    return null;
+  };
+
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    const passwordError = validatePassword(formData.password);
+    if (passwordError) {
+      showToast(passwordError, "error");
+      setError(passwordError);
+      return;
+    }
+
     if (role === 'DRIVER' && (!formData.licenseDoc || !formData.ninDoc)) {
       showToast("Documents required for Driver accounts", "error");
       return;
@@ -368,7 +391,7 @@ const AuthPage: React.FC = () => {
                <button type="button" onClick={() => setView('FORGOT')} className="text-blue-600">Forgot Password?</button>
             </div>
             
-            <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-blue-600 transition shadow-xl uppercase tracking-[0.2em] text-xs" disabled={isLoading}>{isLoading ? "SIGNING IN..." : "SIGN IN"}</button>
+            <button type="submit" className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl hover:bg-blue-600 transition shadow-xl uppercase tracking-[0.2em] text-xs" disabled={isLoading}>{isLoading ? "Signing in.." : "SIGN IN"}</button>
             
             <p className="text-center font-bold text-slate-400 text-xs">New account? <button type="button" onClick={() => setView('SIGNUP')} className="text-blue-600 underline">Create Account</button></p>
           </form>

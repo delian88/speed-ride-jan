@@ -45,7 +45,8 @@ const saveMock = () => {
 };
 
 const getSql = () => {
-  const url = process.env.DATABASE_URL || PRODUCTION_DB_URL;
+  // @ts-ignore
+  const url = (typeof process !== 'undefined' && process.env?.DATABASE_URL) || PRODUCTION_DB_URL;
   if (!url) {
     if (!isMock) { isMock = true; loadMock(); }
     return null;
